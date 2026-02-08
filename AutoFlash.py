@@ -10,6 +10,7 @@ import hashlib
 import os
 import signal
 import sys
+import tempfile
 import textwrap
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -17,9 +18,19 @@ from pathlib import Path
 
 import esptool
 import requests
+from requests.exceptions import RequestException
 import serial.tools.list_ports
 from rich.console import Console
 from rich.style import Style
+
+
+# Constants
+REQUEST_TIMEOUT = 30  # seconds
+BASE_URL = "https://firmware.openshock.org"
+BAUD_RATE = "460800"
+FLASH_MODE = "dio"
+FLASH_FREQ = "80m"
+FLASH_ADDRESS = "0x0000"
 
 
 # Color styles for different states
@@ -41,7 +52,7 @@ class AutoFlasher:
         self.board = board
         self.erase_flash = erase_flash
         self.auto_flash = auto_flash
-        self.base_url = "https://firmware.openshock.org"
+        self.base_url = BASE_URL
         self.known_ports = set()
         self.state = "waiting"
         self.current_style = StateColors.WAITING
@@ -99,7 +110,7 @@ class AutoFlasher:
             return self.version_cache
         url = f"{self.base_url}/version-{self.channel}.txt"
         self.log(f"Fetching version from {self.channel} channel...")
-        response = requests.get(url)
+        response = requests.get(url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         self.version_cache = response.text.strip()
         self.log(f"Latest {self.channel} version: {self.version_cache}")
@@ -111,7 +122,7 @@ class AutoFlasher:
             return self.boards_cache
         url = f"{self.base_url}/{version}/boards.txt"
         self.log("Fetching available boards...")
-        response = requests.get(url)
+        response = requests.get(url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         self.boards_cache = [line.strip() for line in response.text.strip().split("\n")]
         self.log(f"Available boards: {', '.join(self.boards_cache)}")
@@ -126,12 +137,12 @@ class AutoFlasher:
 
         # Parallel download of firmware and hash
         def download_firmware_data():
-            response = requests.get(firmware_url, stream=True)
+            response = requests.get(firmware_url, stream=True, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             return response.content
 
         def download_hash_data():
-            response = requests.get(hash_url)
+            response = requests.get(hash_url, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             return response.text
 
@@ -157,9 +168,9 @@ class AutoFlasher:
         if not expected_hash:
             raise ValueError("Could not find hash for firmware.bin")
 
-        # Verify hash
-        calculated_hash = hashlib.sha256(firmware_data).hexdigest()
-        if calculated_hash != expected_hash:
+        # Verify hash (case-insensitive comparison)
+        calculated_hash = hashlib.sha256(firmware_data).hexdigest().lower()
+        if calculated_hash != expected_hash.lower():
             raise ValueError(
                 f"Hash mismatch! Expected {expected_hash}, got {calculated_hash}"
             )
@@ -181,15 +192,17 @@ class AutoFlasher:
             firmware_data = self.download_firmware(version, board)
 
             # Save firmware to temporary file
-            temp_firmware = Path("/tmp/openshock_firmware.bin")
-            temp_firmware.write_bytes(firmware_data)
+            temp_file = tempfile.NamedTemporaryFile(mode='wb', suffix='.bin', prefix='openshock_', delete=False)
+            temp_firmware = Path(temp_file.name)
+            temp_file.write(firmware_data)
+            temp_file.close()
 
             # Prepare esptool arguments
             args = [
                 "--port",
                 port,
                 "--baud",
-                "460800",
+                BAUD_RATE,
                 "--chip",
                 "auto",
                 "write-flash",
@@ -197,7 +210,7 @@ class AutoFlasher:
 
             if self.erase_flash:
                 self.log("Erasing flash...")
-                erase_args = ["--port", port, "--baud", "460800", "erase-flash"]
+                erase_args = ["--port", port, "--baud", BAUD_RATE, "erase-flash"]
 
                 try:
                     esptool.main(erase_args)
@@ -210,12 +223,12 @@ class AutoFlasher:
             args.extend(
                 [
                     "--flash-mode",
-                    "dio",
+                    FLASH_MODE,
                     "--flash-freq",
-                    "80m",
+                    FLASH_FREQ,
                     "--flash-size",
                     "detect",
-                    "0x0000",
+                    FLASH_ADDRESS,
                     str(temp_firmware),
                 ]
             )
@@ -233,11 +246,11 @@ class AutoFlasher:
                 "--port",
                 port,
                 "--baud",
-                "460800",
+                BAUD_RATE,
                 "--chip",
                 "auto",
                 "verify-flash",
-                "0x0000",
+                FLASH_ADDRESS,
                 str(temp_firmware),
             ]
 
@@ -259,6 +272,7 @@ class AutoFlasher:
 
         except Exception as e:
             self.set_state("error")
+            temp_firmware.unlink(missing_ok=True)
             self.log(f"✗ Error during flashing: {e}")
             raise
 
@@ -270,11 +284,13 @@ class AutoFlasher:
 
             if new_ports:
                 self.known_ports = current_ports
-                return list(new_ports)[0]
+                # Return all new ports, not just the first
+                return list(new_ports)
 
             self.known_ports = current_ports
-        except Exception:
-            pass  # Silently ignore errors in port detection
+        except Exception as e:
+            # Log port detection errors instead of silently ignoring
+            self.log(f"⚠ Warning: Port detection error: {e}")
         return None
 
     def run(self):
@@ -322,25 +338,27 @@ class AutoFlasher:
             consecutive_checks = 0
 
             while True:
-                new_port = self.detect_new_port()
+                new_ports = self.detect_new_port()
 
-                if new_port:
-                    self.log(f"✓ Device detected on {new_port}")
-                    poll_interval = 0.5  # Reset to fast polling after device detected
-                    consecutive_checks = 0
-
-                    if self.auto_flash:
-                        time.sleep(1)  # Give device time to initialize
-                        self.flash_device(new_port, version, self.board)
+                if new_ports:
+                    # Process all newly detected ports
+                    for new_port in new_ports:
+                        self.log(f"✓ Device detected on {new_port}")
+                        poll_interval = 0.5  # Reset to fast polling after device detected
+                        consecutive_checks = 0
 
                         if self.auto_flash:
-                            self.log("")
-                            self.set_state("waiting")
-                            self.log("Waiting for next device...")
-                            self.log("(Press Ctrl+C to exit)")
-                            self.log("")
-                    else:
-                        self.log("Auto-flash disabled. Skipping...")
+                            time.sleep(1)  # Give device time to initialize
+                            self.flash_device(new_port, version, self.board)
+
+                            if self.auto_flash:
+                                self.log("")
+                                self.set_state("waiting")
+                                self.log("Waiting for next device...")
+                                self.log("(Press Ctrl+C to exit)")
+                                self.log("")
+                        else:
+                            self.log("Auto-flash disabled. Skipping...")
                 else:
                     # Gradually increase polling interval if no activity
                     consecutive_checks += 1
@@ -350,7 +368,6 @@ class AutoFlasher:
                 time.sleep(poll_interval)
 
         except KeyboardInterrupt:
-            # Should not reach here due to signal handler, but just in case
             console.print("\n")
             self.log("Exiting...")
 
@@ -358,20 +375,18 @@ class AutoFlasher:
             self.set_state("error")
             self.log(f"Fatal error: {e}")
             import traceback
-
             traceback.print_exc()
 
 
 def fetch_boards_for_help(channel="stable"):
     """Fetch boards list for help text"""
     try:
-        base_url = "https://firmware.openshock.org"
-        version_url = f"{base_url}/version-{channel}.txt"
+        version_url = f"{BASE_URL}/version-{channel}.txt"
         response = requests.get(version_url, timeout=5)
         response.raise_for_status()
         version = response.text.strip()
 
-        boards_url = f"{base_url}/{version}/boards.txt"
+        boards_url = f"{BASE_URL}/{version}/boards.txt"
         response = requests.get(boards_url, timeout=5)
         response.raise_for_status()
         boards = [line.strip() for line in response.text.strip().split("\n")]
@@ -386,7 +401,7 @@ def main():
         console.print("\n")
         console.print("Exiting...", style=Style(color="white"))
         console.print("\033[0m")  # Reset terminal
-        os._exit(0)  # Force immediate exit
+        sys.exit(0)  # Clean exit with proper cleanup
 
     signal.signal(signal.SIGINT, signal_handler)
 
