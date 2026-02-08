@@ -15,6 +15,8 @@ Automatically flash OpenShock firmware to ESP32 devices when they are plugged in
 - **Parallel downloads** for faster firmware retrieval
 - **Continuous mode** - flash multiple devices in sequence
 - **Optional flash erase** before flashing
+- **Smart text wrapping** - Long messages wrap cleanly without cutting words
+- **Dynamic boards list** - View available boards for any channel via `--help`
 
 ## Requirements
 
@@ -45,6 +47,14 @@ Flash devices using the stable firmware channel:
 
 ```bash
 python3 AutoFlash.py --board <board-name>
+```
+
+**To see available boards for a specific channel:**
+
+```bash
+python3 AutoFlash.py --help                    # Shows boards for stable channel
+python3 AutoFlash.py --channel beta --help     # Shows boards for beta channel
+python3 AutoFlash.py -c develop --help         # Shows boards for develop channel
 ```
 
 ### Command-Line Options
@@ -94,15 +104,17 @@ python3 AutoFlash.py --board Wemos-D1-Mini-ESP32 --no-auto
 8. **Repeats** for additional devices (continuous mode)
 
 The tool uses esptool with optimized settings:
+ from firmware.openshock.org.
 
-- Baud rate: 460800
-- Flash mode: DIO
-- Flash frequency: 80MHz
-- Auto-detect flash size
+**To view the current list of available boards, run:**
 
-## Supported Boards
+```bash
+python3 AutoFlash.py --help                    # Stable channel boards
+python3 AutoFlash.py --channel beta --help     # Beta channel boards
+python3 AutoFlash.py -c develop --help         # Develop channel boards
+```
 
-The tool automatically fetches the list of available boards for the selected channel. Common board types include:
+Common board types include:
 
 - `Wemos-D1-Mini-ESP32`
 - `Wemos-Lolin-S2-Mini`
@@ -110,6 +122,14 @@ The tool automatically fetches the list of available boards for the selected cha
 - `Wemos-Lolin-S3-Mini`
 - `Waveshare_esp32_s3_zero`
 - `Pishock-2023`
+- `Pishock-Lite-2021`
+- `Seeed-Xiao-ESP32C3`
+- `Seeed-Xiao-ESP32S3`
+- `DFRobot-Firebeetle2-ESP32E`
+- `OpenShock-Core-V1`
+- `OpenShock-Core-V2`
+
+**Note:** Different channels may have different board support. Always check the help output
 - `Pishock-Lite-2021`
 - `Seeed-Xiao-ESP32C3`
 - `Seeed-Xiao-ESP32S3`

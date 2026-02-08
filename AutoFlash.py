@@ -362,6 +362,24 @@ class AutoFlasher:
             traceback.print_exc()
 
 
+def fetch_boards_for_help(channel="stable"):
+    """Fetch boards list for help text"""
+    try:
+        base_url = "https://firmware.openshock.org"
+        version_url = f"{base_url}/version-{channel}.txt"
+        response = requests.get(version_url, timeout=5)
+        response.raise_for_status()
+        version = response.text.strip()
+
+        boards_url = f"{base_url}/{version}/boards.txt"
+        response = requests.get(boards_url, timeout=5)
+        response.raise_for_status()
+        boards = [line.strip() for line in response.text.strip().split("\n")]
+        return boards
+    except Exception:
+        return ["(Unable to fetch boards list - check network connection)"]
+
+
 def main():
     # Set up signal handler for clean exit on Ctrl+C
     def signal_handler(sig, frame):
@@ -372,7 +390,24 @@ def main():
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    parser = argparse.ArgumentParser(description="OpenShock Auto-Flasher")
+    # Parse channel early to fetch correct boards list for help text
+    channel = "stable"
+    for i, arg in enumerate(sys.argv):
+        if arg in ["--channel", "-c"] and i + 1 < len(sys.argv):
+            candidate = sys.argv[i + 1]
+            if candidate in ["stable", "beta", "develop"]:
+                channel = candidate
+                break
+
+    # Fetch boards for help text using the specified channel
+    boards_list = fetch_boards_for_help(channel)
+    boards_help = f"Available boards ({channel} channel):\n  " + "\n  ".join(boards_list)
+
+    parser = argparse.ArgumentParser(
+        description="OpenShock Auto-Flasher",
+        epilog=boards_help,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "--channel",
         "-c",
