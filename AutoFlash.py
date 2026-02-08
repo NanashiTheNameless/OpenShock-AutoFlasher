@@ -397,7 +397,7 @@ def main():
     # Set up signal handler for clean exit on Ctrl+C
     def signal_handler(sig, frame):
         console.print("\n")
-        console.print("Exiting...", style=Style(color="white"))
+        console.print("Exiting...", style=Style(color="white"), markup=False, highlight=False)
         sys.exit(0)  # Clean exit with proper cleanup
 
     signal.signal(signal.SIGINT, signal_handler)
@@ -453,9 +453,6 @@ def main():
     )
 
     flasher.run()
-
-    # Reset terminal on exit
-    console.print("\033[0m")
 
 
 if __name__ == "__main__":
