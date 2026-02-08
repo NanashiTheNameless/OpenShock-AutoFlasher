@@ -1,0 +1,4 @@
+esptool>=5.1.0
+pyserial>=3.5
+requests>=2.32.5
+rich>=14.3.2
