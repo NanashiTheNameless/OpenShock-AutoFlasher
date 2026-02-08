@@ -34,7 +34,7 @@ cd OpenShock-AutoFlasher
 2. Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ## Usage
@@ -44,7 +44,7 @@ pip install -r requirements.txt
 Flash devices using the stable firmware channel:
 
 ```bash
-python AutoFlash.py --board <board-name>
+python3 AutoFlash.py --board <board-name>
 ```
 
 ### Command-Line Options
@@ -61,25 +61,25 @@ python AutoFlash.py --board <board-name>
 **Flash with stable firmware:**
 
 ```bash
-python AutoFlash.py --board Wemos-D1-Mini-ESP32
+python3 AutoFlash.py --board Wemos-D1-Mini-ESP32
 ```
 
 **Flash with beta firmware and erase existing data:**
 
 ```bash
-python AutoFlash.py --channel beta --board Wemos-D1-Mini-ESP32 --erase
+python3 AutoFlash.py --channel beta --board Wemos-D1-Mini-ESP32 --erase
 ```
 
 **Use development firmware:**
 
 ```bash
-python AutoFlash.py --channel develop --board Wemos-D1-Mini-ESP32
+python3 AutoFlash.py --channel develop --board Wemos-D1-Mini-ESP32
 ```
 
 **Detect devices without auto-flashing:**
 
 ```bash
-python AutoFlash.py --board Wemos-D1-Mini-ESP32 --no-auto
+python3 AutoFlash.py --board Wemos-D1-Mini-ESP32 --no-auto
 ```
 
 ## How It Works
