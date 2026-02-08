@@ -318,8 +318,6 @@ class AutoFlasher:
                 self.log(f"Available boards: {', '.join(boards)}")
                 return
 
-            self.log(f"✓ Board '{self.board}' validated successfully")
-
         except Exception as e:
             self.set_state("error")
             self.log(f"Error fetching firmware info: {e}")
