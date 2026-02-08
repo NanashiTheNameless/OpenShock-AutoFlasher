@@ -398,7 +398,6 @@ def main():
     def signal_handler(sig, frame):
         console.print("\n")
         console.print("Exiting...", style=Style(color="white"))
-        console.print("\033[0m")  # Reset terminal
         sys.exit(0)  # Clean exit with proper cleanup
 
     signal.signal(signal.SIGINT, signal_handler)
