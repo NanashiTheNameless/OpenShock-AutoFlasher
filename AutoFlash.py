@@ -192,7 +192,7 @@ class AutoFlasher:
             firmware_data = self.download_firmware(version, board)
 
             # Save firmware to temporary file
-            temp_file = tempfile.NamedTemporaryFile(mode='wb', suffix='.bin', prefix='openshock_', delete=False)
+            temp_file = tempfile.NamedTemporaryFile(mode='wb', suffix='.bin', prefix='OpenShock_Firmware_', delete=False)
             temp_firmware = Path(temp_file.name)
             temp_file.write(firmware_data)
             temp_file.close()
