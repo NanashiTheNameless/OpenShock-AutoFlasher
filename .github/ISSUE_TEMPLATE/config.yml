@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Discussions
+    url: https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/discussions
+    about: Ask questions or start a discussion about the project
+  - name: OpenShock WiKi
+    url: https://wiki.openshock.org/
+    about: Visit the OpenShock WiKi for more information
+  - name: OpenShock Community
+    url: https://github.com/OpenShock
+    about: Visit the OpenShock project for more information

@@ -1,6 +1,6 @@
 [project]
 name = "OpenShock-AutoFlasher"
-version = "0.0.3"
+version = "0.0.4"
 description = "Automatically flash OpenShock firmware to ESP32 devices"
 readme = "README.md"
 license = {text = "AGPL-3.0"}
@@ -16,11 +16,17 @@ keywords = ["openshock", "esp32", "firmware", "flasher"]
 requires-python = ">=3.12"
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Environment :: Console",
     "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
     "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Natural Language :: English",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Hardware",
+    "Topic :: Utilities",
+    "Typing :: Typed",
 ]
 dependencies = [
     "esptool>=5.1.0",
@@ -41,9 +47,11 @@ dev = [
 
 [project.urls]
 Repository = "https://github.com/NanashiTheNameless/OpenShock-AutoFlasher"
+Homepage = "https://github.com/NanashiTheNameless/OpenShock-AutoFlasher"
 Issues = "https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/issues"
 "GitHub Sponsor" = "https://github.com/sponsors/NanashiTheNameless"
 "Buy Me a Coffee" = "https://buymeacoffee.com/NamelessNanashi"
+Author = "https://github.com/NanashiTheNameless"
 
 [project.scripts]
 OPSH-AutoFlash = "openshock_autoflasher.cli:main"
