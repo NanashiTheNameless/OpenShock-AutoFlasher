@@ -46,9 +46,7 @@ class AutoFlasher:
         self.board: Optional[str] = board
         self.erase_flash: bool = erase_flash
         self.auto_flash: bool = auto_flash
-        self.post_flash_commands: List[str] = (
-            post_flash_commands or []
-        )
+        self.post_flash_commands: List[str] = post_flash_commands or []
         self.base_url: str = BASE_URL
         self.known_ports: Set[str] = set()
         self.state: str = "waiting"
@@ -126,9 +124,7 @@ class AutoFlasher:
         self.log("Fetching available boards...")
         response = requests.get(url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
-        self.boards_cache = [
-            line.strip() for line in response.text.strip().split("\n")
-        ]
+        self.boards_cache = [line.strip() for line in response.text.strip().split("\n")]
         self.log(f"Available boards: {', '.join(self.boards_cache)}")
         return self.boards_cache
 
@@ -136,25 +132,17 @@ class AutoFlasher:
         """Download and verify firmware binary with progress"""
         self.log(f"Downloading firmware for {board}...")
 
-        firmware_url = (
-            f"{self.base_url}/{version}/{board}/firmware.bin"
-        )
-        hash_url = (
-            f"{self.base_url}/{version}/{board}/hashes.sha256.txt"
-        )
+        firmware_url = f"{self.base_url}/{version}/{board}/firmware.bin"
+        hash_url = f"{self.base_url}/{version}/{board}/hashes.sha256.txt"
 
         # Parallel download of firmware and hash
         def download_firmware_data():
-            response = requests.get(
-                firmware_url, stream=True, timeout=REQUEST_TIMEOUT
-            )
+            response = requests.get(firmware_url, stream=True, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             return response.content
 
         def download_hash_data():
-            response = requests.get(
-                hash_url, timeout=REQUEST_TIMEOUT
-            )
+            response = requests.get(hash_url, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             return response.text
 
@@ -183,10 +171,7 @@ class AutoFlasher:
         # Verify hash (case-insensitive comparison)
         calculated_hash = hashlib.sha256(firmware_data).hexdigest().lower()
         if calculated_hash != expected_hash.lower():
-            raise ValueError(
-                f"Hash mismatch! Expected {expected_hash}, "
-                f"got {calculated_hash}"
-            )
+            raise ValueError(f"Hash mismatch! Expected {expected_hash}, " f"got {calculated_hash}")
 
         size_bytes = len(firmware_data)
         self.log(f"✓ Firmware downloaded and verified ({size_bytes} bytes)")
@@ -225,11 +210,7 @@ class AutoFlasher:
 
                 # Read any response
                 if ser.in_waiting > 0:
-                    response = (
-                        ser.read(ser.in_waiting)
-                        .decode("utf-8", errors="ignore")
-                        .strip()
-                    )
+                    response = ser.read(ser.in_waiting).decode("utf-8", errors="ignore").strip()
                     if response:
                         self.log(f"Response: {response}")
 
@@ -238,9 +219,7 @@ class AutoFlasher:
             self.log("=" * 60)
 
         except Exception as e:
-            self.log(
-                f"⚠ Warning: Post-flash command execution failed: {e}"
-            )
+            self.log(f"⚠ Warning: Post-flash command execution failed: {e}")
             self.log("Continuing anyway...")
 
     def flash_device(self, port: str, version: str, board: str) -> None:
@@ -293,9 +272,7 @@ class AutoFlasher:
                     esptool.main(erase_args)
                 except SystemExit as e:
                     if e.code != 0:
-                        raise Exception(
-                            f"Erase failed with exit code {e.code}"
-                        )
+                        raise Exception(f"Erase failed with exit code {e.code}")
 
                 self.log("✓ Erase complete")
 
@@ -318,9 +295,7 @@ class AutoFlasher:
                 esptool.main(args)
             except SystemExit as e:
                 if e.code != 0:
-                    raise Exception(
-                        f"Flash failed with exit code {e.code}"
-                    )
+                    raise Exception(f"Flash failed with exit code {e.code}")
 
             self.log("Verifying flash...")
             verify_args = [
@@ -339,9 +314,7 @@ class AutoFlasher:
                 esptool.main(verify_args)
             except SystemExit as e:
                 if e.code != 0:
-                    raise Exception(
-                        f"Verification failed with exit code {e.code}"
-                    )
+                    raise Exception(f"Verification failed with exit code {e.code}")
 
             self.log("✓ Verification complete!")
 
@@ -368,9 +341,7 @@ class AutoFlasher:
     def detect_new_port(self) -> Optional[List[str]]:
         """Detect when a new serial port is connected"""
         try:
-            current_ports = set(
-                [p.device for p in serial.tools.list_ports.comports()]
-            )
+            current_ports = set([p.device for p in serial.tools.list_ports.comports()])
             new_ports = current_ports - self.known_ports
 
             if new_ports:
@@ -405,10 +376,7 @@ class AutoFlasher:
             # Early validation: check board exists before waiting
             if self.board not in boards:
                 self.set_state("error")
-                self.log(
-                    f"Error: Board '{self.board}' not found "
-                    "in available boards"
-                )
+                self.log(f"Error: Board '{self.board}' not found " "in available boards")
                 self.log(f"Available boards: {', '.join(boards)}")
                 return
 
@@ -418,9 +386,7 @@ class AutoFlasher:
             return
 
         # Initialize known ports
-        self.known_ports = set(
-            [p.device for p in serial.tools.list_ports.comports()]
-        )
+        self.known_ports = set([p.device for p in serial.tools.list_ports.comports()])
 
         self.set_state("waiting")
         self.log("Waiting for device to be plugged in...")
@@ -445,9 +411,7 @@ class AutoFlasher:
                         if self.auto_flash:
                             # Give device time to initialize
                             time.sleep(DEVICE_INIT_DELAY)
-                            self.flash_device(
-                                new_port, version, self.board
-                            )
+                            self.flash_device(new_port, version, self.board)
 
                             if self.auto_flash:
                                 self.log("")
@@ -461,9 +425,7 @@ class AutoFlasher:
                     # Gradually increase polling interval if no activity
                     consecutive_checks += 1
                     if consecutive_checks > POLL_BACKOFF_THRESHOLD:
-                        poll_interval = min(
-                            MAX_POLL_INTERVAL, poll_interval + 0.1
-                        )
+                        poll_interval = min(MAX_POLL_INTERVAL, poll_interval + 0.1)
 
                 time.sleep(poll_interval)
 

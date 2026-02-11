@@ -104,9 +104,7 @@ def test_argument_parser_post_flash_single():
     """Test parser with single post-flash command"""
     parser = create_argument_parser()
 
-    args = parser.parse_args(
-        ["--board", "test-board", "--post-flash", "command1"]
-    )
+    args = parser.parse_args(["--board", "test-board", "--post-flash", "command1"])
 
     assert args.post_flash == ["command1"]
 
@@ -139,8 +137,6 @@ def test_argument_parser_post_flash_short_option():
     """Test parser with post-flash short option"""
     parser = create_argument_parser()
 
-    args = parser.parse_args(
-        ["-b", "test-board", "-p", "command1", "-p", "command2"]
-    )
+    args = parser.parse_args(["-b", "test-board", "-p", "command1", "-p", "command2"])
 
     assert args.post_flash == ["command1", "command2"]

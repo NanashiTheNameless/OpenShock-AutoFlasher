@@ -36,10 +36,7 @@ def create_argument_parser(channel: str = "stable") -> argparse.ArgumentParser:
     """Create and return the argument parser with dynamic help text"""
     # Fetch boards for help text using the specified channel
     boards_list = fetch_boards_for_help(channel)
-    boards_help = (
-        f"Available boards ({channel} channel):\n  "
-        + "\n  ".join(boards_list)
-    )
+    boards_help = f"Available boards ({channel} channel):\n  " + "\n  ".join(boards_list)
 
     parser = argparse.ArgumentParser(
         description="OpenShock Auto-Flasher",
@@ -53,9 +50,7 @@ def create_argument_parser(channel: str = "stable") -> argparse.ArgumentParser:
         default="stable",
         help="Firmware channel (default: stable)",
     )
-    parser.add_argument(
-        "--board", "-b", required=True, help="Board type (required)"
-    )
+    parser.add_argument("--board", "-b", required=True, help="Board type (required)")
     parser.add_argument(
         "--erase",
         "-e",
