@@ -1,4 +1,4 @@
-# OpenShock Auto-Flasher
+# OpenShock Auto-Flasher [![Ask DeepWiki](<https://deepwiki.com/badge.svg>)](<https://deepwiki.com/NanashiTheNameless/OpenShock-AutoFlasher>)
 
 [![PyPI version](https://img.shields.io/pypi/v/OpenShock-AutoFlasher.svg)](https://pypi.org/project/OpenShock-AutoFlasher/)
 [![Python versions](https://img.shields.io/pypi/pyversions/OpenShock-AutoFlasher.svg)](https://pypi.org/project/OpenShock-AutoFlasher/)
