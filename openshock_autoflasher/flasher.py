@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional, List, Set
 
 import esptool
+import esptool.util
 import requests
 import serial
 import serial.tools.list_ports
@@ -270,9 +271,11 @@ class AutoFlasher:
 
                 try:
                     esptool.main(erase_args)
-                except SystemExit as e:
-                    if e.code != 0:
-                        raise Exception(f"Erase failed with exit code {e.code}")
+                except (SystemExit, esptool.util.FatalError) as e:
+                    if isinstance(e, SystemExit) and e.code == 0:
+                        pass
+                    else:
+                        raise Exception(f"Erase failed: {e}")
 
                 self.log("✓ Erase complete")
 
@@ -293,9 +296,11 @@ class AutoFlasher:
 
             try:
                 esptool.main(args)
-            except SystemExit as e:
-                if e.code != 0:
-                    raise Exception(f"Flash failed with exit code {e.code}")
+            except (SystemExit, esptool.util.FatalError) as e:
+                if isinstance(e, SystemExit) and e.code == 0:
+                    pass
+                else:
+                    raise Exception(f"Flash failed: {e}")
 
             self.log("Verifying flash...")
             verify_args = [
@@ -312,9 +317,11 @@ class AutoFlasher:
 
             try:
                 esptool.main(verify_args)
-            except SystemExit as e:
-                if e.code != 0:
-                    raise Exception(f"Verification failed with exit code {e.code}")
+            except (SystemExit, esptool.util.FatalError) as e:
+                if isinstance(e, SystemExit) and e.code == 0:
+                    pass
+                else:
+                    raise Exception(f"Verification failed: {e}")
 
             self.log("✓ Verification complete!")
 
