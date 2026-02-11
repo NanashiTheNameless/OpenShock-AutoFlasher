@@ -302,8 +302,6 @@ class AutoFlasher:
                 else:
                     raise Exception(f"Flash failed: {e}")
 
-            self.log("✓ Flashing complete!")
-
             # Execute post-flash commands if any
             if self.post_flash_commands:
                 self.execute_post_flash_commands(port)
