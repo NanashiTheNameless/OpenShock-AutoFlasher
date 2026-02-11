@@ -1,6 +1,6 @@
 [project]
 name = "OpenShock-AutoFlasher"
-version = "0.0.5"
+version = "0.0.6"
 description = "Automatically flash OpenShock firmware to ESP32 devices"
 readme = "README.md"
 license = {text = "AGPL-3.0"}
