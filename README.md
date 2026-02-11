@@ -1,5 +1,10 @@
 # OpenShock Auto-Flasher
 
+[![PyPI version](https://img.shields.io/pypi/v/OpenShock-AutoFlasher.svg)](https://pypi.org/project/OpenShock-AutoFlasher/)
+[![Python versions](https://img.shields.io/pypi/pyversions/OpenShock-AutoFlasher.svg)](https://pypi.org/project/OpenShock-AutoFlasher/)
+![Tests](https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/workflows/Tests/badge.svg)
+[![License](https://img.shields.io/github/license/NanashiTheNameless/OpenShock-AutoFlasher)](LICENSE)
+
 Automatically flash OpenShock firmware to ESP32 devices when they are plugged in. Features color-coded terminal backgrounds to indicate the current status at a glance.
 
 ## Features
@@ -12,7 +17,7 @@ Automatically flash OpenShock firmware to ESP32 devices when they are plugged in
   - **Red** - Error occurred
 - **Firmware verification** using SHA256 checksums
 - **Multiple channels** - stable, beta, or develop
-- **Parallel downloads** for faster firmware retrieval
+- **Post-flash commands** - Send serial commands to device after flashing
 - **Continuous mode** - flash multiple devices in sequence
 - **Optional flash erase** before flashing
 - **Smart text wrapping** - Long messages wrap cleanly without cutting words
@@ -20,11 +25,31 @@ Automatically flash OpenShock firmware to ESP32 devices when they are plugged in
 
 ## Requirements
 
-- Python 3.6 or higher
+- Python 3.12 or higher
 - Linux, macOS, or Windows
 - USB connection to ESP32 devices
 
 ## Installation
+
+### From GitHub with pipx (Recommended)
+
+Install directly from the latest GitHub version:
+
+```bash
+pipx install --force 'OpenShock-AutoFlasher @ git+https://github.com/NanashiTheNameless/OpenShock-AutoFlasher@main'
+```
+
+This makes the `OPSH-AutoFlash` command available system-wide.
+
+### Alternative: From PyPI
+
+If you prefer a release from PyPI:
+
+```bash
+pipx install OpenShock-AutoFlasher
+```
+
+### From Source
 
 1. Clone this repository:
 
@@ -33,7 +58,7 @@ git clone https://github.com/NanashiTheNameless/OpenShock-AutoFlasher.git
 cd OpenShock-AutoFlasher
 ```
 
-2. Install dependencies:
+1. Install dependencies:
 
 ```bash
 pip3 install -r requirements.txt
@@ -46,50 +71,60 @@ pip3 install -r requirements.txt
 Flash devices using the stable firmware channel:
 
 ```bash
-python3 AutoFlash.py --board <board-name>
+OPSH-AutoFlash --board <board-name>
 ```
 
-**To see available boards for a specific channel:**
+View available boards for different channels:
 
 ```bash
-python3 AutoFlash.py --help                    # Shows boards for stable channel
-python3 AutoFlash.py --channel beta --help     # Shows boards for beta channel
-python3 AutoFlash.py -c develop --help         # Shows boards for develop channel
+OPSH-AutoFlash --help                        # Shows boards for stable channel
+OPSH-AutoFlash --channel beta --help         # Shows boards for beta channel
+OPSH-AutoFlash -c develop --help             # Shows boards for develop channel
 ```
 
 ### Command-Line Options
 
-| Option      | Short | Description                                      | Default  |
-|-------------|-------|--------------------------------------------------|----------|
-| `--channel` | `-c`  | Firmware channel: `stable`, `beta`, or `develop` | `stable` |
-| `--board`   | `-b`  | Board type (required)                            | -        |
-| `--erase`   | `-e`  | Erase flash before flashing                      | `false`  |
-| `--no-auto` | `-n`  | Disable auto-flash (just detect devices)         | `false`  |
+| Option         | Short | Description                                                | Default  |
+|----------------|-------|------------------------------------------------------------|----------|
+| `--channel`    | `-c`  | Firmware channel: `stable`, `beta`, or `develop`           | `stable` |
+| `--board`      | `-b`  | Board type (required)                                      | -        |
+| `--erase`      | `-e`  | Erase flash before flashing                                | `false`  |
+| `--no-auto`    | `-n`  | Disable auto-flash (just detect devices)                   | `false`  |
+| `--post-flash` | `-p`  | Serial command to send after flashing (can use multiple times) | -        |
 
 ### Examples
 
 **Flash with stable firmware:**
 
 ```bash
-python3 AutoFlash.py --board Wemos-D1-Mini-ESP32
+OPSH-AutoFlash --board Wemos-D1-Mini-ESP32
 ```
 
 **Flash with beta firmware and erase existing data:**
 
 ```bash
-python3 AutoFlash.py --channel beta --board Wemos-D1-Mini-ESP32 --erase
+OPSH-AutoFlash --channel beta --board Wemos-D1-Mini-ESP32 --erase
+```
+
+**Flash and send post-flash commands to device:**
+
+```bash
+OPSH-AutoFlash --board Wemos-D1-Mini-ESP32 \
+  --post-flash "help" \
+  --post-flash "version" \
+  --post-flash "status"
 ```
 
 **Use development firmware:**
 
 ```bash
-python3 AutoFlash.py --channel develop --board Wemos-D1-Mini-ESP32
+OPSH-AutoFlash --channel develop --board Wemos-D1-Mini-ESP32
 ```
 
 **Detect devices without auto-flashing:**
 
 ```bash
-python3 AutoFlash.py --board Wemos-D1-Mini-ESP32 --no-auto
+OPSH-AutoFlash --board Wemos-D1-Mini-ESP32 --no-auto
 ```
 
 ## How It Works
@@ -101,17 +136,19 @@ python3 AutoFlash.py --board Wemos-D1-Mini-ESP32 --no-auto
 5. **Verifies** firmware integrity using SHA256
 6. **Flashes** the device using esptool
 7. **Verifies** the flash was successful
-8. **Repeats** for additional devices (continuous mode)
+8. **Executes** post-flash commands over serial (if specified)
+9. **Repeats** for additional devices (continuous mode)
 
-The tool uses esptool with optimized settings:
- from firmware.openshock.org.
+The tool uses esptool with optimized settings and can send serial commands to the device after flashing for automated configuration or testing.
 
-**To view the current list of available boards, run:**
+## Supported Boards
+
+The tool supports multiple ESP32-based boards. To view the current list of available boards, run:
 
 ```bash
-python3 AutoFlash.py --help                    # Stable channel boards
-python3 AutoFlash.py --channel beta --help     # Beta channel boards
-python3 AutoFlash.py -c develop --help         # Develop channel boards
+OPSH-AutoFlash --help                        # Stable channel boards
+OPSH-AutoFlash --channel beta --help         # Beta channel boards
+OPSH-AutoFlash -c develop --help             # Develop channel boards
 ```
 
 Common board types include:
@@ -129,15 +166,7 @@ Common board types include:
 - `OpenShock-Core-V1`
 - `OpenShock-Core-V2`
 
-**Note:** Different channels may have different board support. Always check the help output
-- `Pishock-Lite-2021`
-- `Seeed-Xiao-ESP32C3`
-- `Seeed-Xiao-ESP32S3`
-- `DFRobot-Firebeetle2-ESP32E`
-- `OpenShock-Core-V1`
-- `OpenShock-Core-V2`
-
-Run the tool to see the current available boards for your selected channel.
+**Note:** Different channels may have different board support. Always check the help output for your selected channel.
 
 ## Permissions (Linux)
 
@@ -169,9 +198,78 @@ Then log out and log back in for the changes to take effect.
 - Check for hardware issues
 - Try a different USB port or cable
 
+## Development
+
+### Running Tests
+
+The project includes a comprehensive test suite using pytest. To run the tests:
+
+1. Install development dependencies:
+
+```bash
+pip install -e .[dev]
+```
+
+1. Run the test suite:
+
+```bash
+pytest tests/ -v
+```
+
+1. Run tests with coverage:
+
+```bash
+pytest tests/ -v --cov=openshock_autoflasher --cov-report=term-missing
+```
+
+### Code Quality
+
+The project uses several tools for code quality:
+
+- **Black** - Code formatting
+- **Flake8** - Linting
+- **Mypy** - Type checking
+
+Run code quality checks:
+
+```bash
+# Format code
+black openshock_autoflasher/ tests/
+
+# Lint code
+flake8 openshock_autoflasher/ tests/
+
+# Type check
+mypy openshock_autoflasher/
+```
+
+### Project Structure
+
+The codebase is modular and organized as follows:
+
+- `openshock_autoflasher/` - Main package
+  - `constants.py` - Configuration constants
+  - `styles.py` - Terminal styling and colors
+  - `flasher.py` - Core AutoFlasher class with flashing logic
+  - `cli.py` - Command-line interface and argument parsing
+  - `__init__.py` - Package initialization
+  - `__main__.py` - Module entry point
+- `tests/` - Test suite
+  - `test_constants.py` - Tests for constants module
+  - `test_styles.py` - Tests for styles module
+  - `test_flasher.py` - Tests for flasher module
+  - `test_cli.py` - Tests for CLI module
+
+### Continuous Integration
+
+The project uses GitHub Actions for CI/CD:
+
+- **Tests Workflow** - Runs tests on Ubuntu, Windows, and macOS with Python 3.12-3.13
+- **Publish Workflow** - Publishes to PyPI on release
+
 ## License
 
-See [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). See [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
