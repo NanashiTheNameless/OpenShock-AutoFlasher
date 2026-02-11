@@ -1,9 +1,9 @@
 # OpenShock Auto-Flasher [![Ask DeepWiki](<https://deepwiki.com/badge.svg>)](<https://deepwiki.com/NanashiTheNameless/OpenShock-AutoFlasher>)
 
-[![PyPI version](https://img.shields.io/pypi/v/OpenShock-AutoFlasher.svg)](https://pypi.org/project/OpenShock-AutoFlasher/)
-[![Python versions](https://img.shields.io/pypi/pyversions/OpenShock-AutoFlasher.svg)](https://pypi.org/project/OpenShock-AutoFlasher/)
-![Tests](https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/workflows/Tests/badge.svg)
-[![License](https://img.shields.io/github/license/NanashiTheNameless/OpenShock-AutoFlasher)](https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/blob/main/LICENSE)
+[![PyPI - Version](https://img.shields.io/pypi/v/OpenShock-AutoFlasher)](https://pypi.org/project/OpenShock-AutoFlasher/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/OpenShock-AutoFlasher)](https://pypi.org/project/OpenShock-AutoFlasher/)
+[![Tests](https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/workflows/Tests/badge.svg)](https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/actions/workflows/test.yml)
+[![GitHub License](https://img.shields.io/github/license/NanashiTheNameless/OpenShock-AutoFlasher)](https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/blob/main/LICENSE)
 
 Automatically flash OpenShock firmware to ESP32 devices when they are plugged in. Features color-coded terminal backgrounds to indicate the current status at a glance.
 
