@@ -17,5 +17,3 @@ INITIAL_POLL_INTERVAL: float = 0.5  # seconds
 MAX_POLL_INTERVAL: float = 1.0  # seconds
 POLL_BACKOFF_THRESHOLD: int = 10  # checks before increasing interval
 DEVICE_INIT_DELAY: int = 1  # seconds to wait after device detection
-POST_FLASH_DELAY: int = 2  # seconds to wait after flashing before verification
-VERIFICATION_RETRIES: int = 3  # number of times to retry verification

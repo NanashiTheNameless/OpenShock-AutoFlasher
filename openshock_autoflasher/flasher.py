@@ -16,7 +16,6 @@ import requests
 import serial
 import serial.tools.list_ports
 from rich.style import Style
-
 from .constants import (
     REQUEST_TIMEOUT,
     BASE_URL,
@@ -28,8 +27,6 @@ from .constants import (
     MAX_POLL_INTERVAL,
     POLL_BACKOFF_THRESHOLD,
     DEVICE_INIT_DELAY,
-    POST_FLASH_DELAY,
-    VERIFICATION_RETRIES,
 )
 from .styles import StateColors, console
 
@@ -248,6 +245,7 @@ class AutoFlasher:
             )
             temp_firmware = Path(temp_file.name)
             temp_file.write(firmware_data)
+            temp_file.flush()
             temp_file.close()
 
             # Prepare esptool arguments
@@ -304,47 +302,7 @@ class AutoFlasher:
                 else:
                     raise Exception(f"Flash failed: {e}")
 
-            # Wait for device to stabilize after flashing before verification
-            self.log(f"Waiting for device to stabilize (waiting {POST_FLASH_DELAY}s)...")
-            time.sleep(POST_FLASH_DELAY)
-
-            self.log("Verifying flash...")
-            verify_args = [
-                "--port",
-                port,
-                "--baud",
-                BAUD_RATE,
-                "--chip",
-                "auto",
-                "verify-flash",
-                FLASH_ADDRESS,
-                str(temp_firmware),
-            ]
-
-            # Retry verification if it fails (sometimes device needs time to settle)
-            verification_attempts = 0
-            last_error = None
-
-            while verification_attempts < VERIFICATION_RETRIES:
-                verification_attempts += 1
-                try:
-                    esptool.main(verify_args)
-                    break  # Verification succeeded
-                except (SystemExit, esptool.util.FatalError) as e:
-                    last_error = e
-                    if isinstance(e, SystemExit) and e.code == 0:
-                        break  # Success
-                    elif verification_attempts < VERIFICATION_RETRIES:
-                        self.log(
-                            f"⚠ Verification attempt {verification_attempts} failed, retrying..."
-                        )
-                        time.sleep(1)  # Wait before retry
-                    else:
-                        raise Exception(
-                            f"Verification failed after {VERIFICATION_RETRIES} attempts: {e}"
-                        )
-
-            self.log("✓ Verification complete!")
+            self.log("✓ Flashing complete!")
 
             # Execute post-flash commands if any
             if self.post_flash_commands:
