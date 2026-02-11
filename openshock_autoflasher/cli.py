@@ -72,6 +72,12 @@ def create_argument_parser(channel: str = "stable") -> argparse.ArgumentParser:
             "(can be specified multiple times, executed in order)"
         ),
     )
+    parser.add_argument(
+        "--alert",
+        "-A",
+        action="store_true",
+        help="Beep audibly when flashing completes",
+    )
 
     return parser
 
@@ -117,6 +123,7 @@ def main() -> None:
         erase_flash=args.erase,
         auto_flash=not args.no_auto,
         post_flash_commands=args.post_flash or [],
+        alert=args.alert,
     )
 
     flasher.run()

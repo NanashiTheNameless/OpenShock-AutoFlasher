@@ -41,12 +41,14 @@ class AutoFlasher:
         erase_flash: bool = False,
         auto_flash: bool = True,
         post_flash_commands: Optional[List[str]] = None,
+        alert: bool = False,
     ) -> None:
         self.channel: str = channel
         self.board: Optional[str] = board
         self.erase_flash: bool = erase_flash
         self.auto_flash: bool = auto_flash
         self.post_flash_commands: List[str] = post_flash_commands or []
+        self.alert: bool = alert
         self.base_url: str = BASE_URL
         self.known_ports: Set[str] = set()
         self.state: str = "waiting"
@@ -70,6 +72,13 @@ class AutoFlasher:
         """Change state and update terminal background"""
         self.state = state
         self.current_style = self.get_style()
+
+    def play_alert(self) -> None:
+        """Play an audible beep alert"""
+        # Beep 4 times with a small delay between each beep
+        for _ in range(4):
+            print("\a", end="", flush=True)
+            time.sleep(0.15)
 
     def log(self, message: str) -> None:
         """Print log message with current background"""
@@ -311,6 +320,10 @@ class AutoFlasher:
             self.log("=" * 60)
             self.log("SUCCESS! Device flashed successfully")
             self.log("=" * 60)
+
+            # Play alert beep if enabled
+            if self.alert:
+                self.play_alert()
 
             # Cleanup
             temp_firmware.unlink(missing_ok=True)
