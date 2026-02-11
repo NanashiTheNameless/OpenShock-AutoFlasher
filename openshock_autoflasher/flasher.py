@@ -335,10 +335,14 @@ class AutoFlasher:
                     if isinstance(e, SystemExit) and e.code == 0:
                         break  # Success
                     elif verification_attempts < VERIFICATION_RETRIES:
-                        self.log(f"⚠ Verification attempt {verification_attempts} failed, retrying...")
+                        self.log(
+                            f"⚠ Verification attempt {verification_attempts} failed, retrying..."
+                        )
                         time.sleep(1)  # Wait before retry
                     else:
-                        raise Exception(f"Verification failed after {VERIFICATION_RETRIES} attempts: {e}")
+                        raise Exception(
+                            f"Verification failed after {VERIFICATION_RETRIES} attempts: {e}"
+                        )
 
             self.log("✓ Verification complete!")
 
