@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/OpenShock-AutoFlasher.svg)](https://pypi.org/project/OpenShock-AutoFlasher/)
 [![Python versions](https://img.shields.io/pypi/pyversions/OpenShock-AutoFlasher.svg)](https://pypi.org/project/OpenShock-AutoFlasher/)
 ![Tests](https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/workflows/Tests/badge.svg)
-[![License](https://img.shields.io/github/license/NanashiTheNameless/OpenShock-AutoFlasher)](LICENSE)
+[![License](https://img.shields.io/github/license/NanashiTheNameless/OpenShock-AutoFlasher)](https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/blob/main/LICENSE)
 
 Automatically flash OpenShock firmware to ESP32 devices when they are plugged in. Features color-coded terminal backgrounds to indicate the current status at a glance.
 
