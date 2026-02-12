@@ -1,6 +1,6 @@
 [project]
 name = "OpenShock-AutoFlasher"
-version = "0.1.1"
+version = "0.1.2"
 description = "Automatically flash OpenShock firmware to ESP32 devices"
 readme = "README.md"
 license = {text = "AGPL-3.0"}
@@ -24,6 +24,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: System :: Hardware",
     "Topic :: Utilities",
     "Typing :: Typed",
@@ -68,7 +69,7 @@ openshock_autoflasher = ["py.typed"]
 
 [tool.black]
 line-length = 100
-target-version = ["py312", "py313"]
+target-version = ["py312", "py313", "py314"]
 
 [tool.mypy]
 python_version = "3.12"

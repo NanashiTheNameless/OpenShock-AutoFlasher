@@ -272,7 +272,7 @@ The codebase is modular and organized as follows:
 
 The project uses GitHub Actions for CI/CD:
 
-- **Tests Workflow** - Runs tests on Ubuntu, Windows, and macOS with Python 3.12-3.13
+- **Tests Workflow** - Runs tests on Ubuntu, Windows, and macOS with Python 3.12-3.14
 - **Publish Workflow** - Publishes to PyPI on release
 
 ## License
