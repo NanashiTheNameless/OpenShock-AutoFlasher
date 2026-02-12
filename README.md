@@ -36,7 +36,7 @@ Automatically flash OpenShock firmware to ESP32 devices when they are plugged in
 Install directly from the latest GitHub version:
 
 ```bash
-pipx install --force 'OpenShock-AutoFlasher @ git+https://github.com/NanashiTheNameless/OpenShock-AutoFlasher@main'
+pipx install --force 'git+https://github.com/NanashiTheNameless/OpenShock-AutoFlasher@main'
 ```
 
 This makes the `OPSH-AutoFlash` command available system-wide.
