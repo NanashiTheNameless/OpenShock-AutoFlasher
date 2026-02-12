@@ -129,3 +129,6 @@ dmypy.json
 # Temporary firmware files
 OpenShock_Firmware_*.bin
 
+# Ruff cache
+.ruff_cache
+
