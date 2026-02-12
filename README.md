@@ -88,7 +88,7 @@ OPSH-AutoFlash -C develop --help             # Shows boards for develop channel
 |----------------|-------|------------------------------------------------------------|----------|
 | `--channel`    | `-C`  | Firmware channel: `stable`, `beta`, or `develop`           | `stable` |
 | `--version`    | `-V`  | Use specific firmware version (overrides channel)          | -        |
-| `--board`      | `-b`  | Board type (required)                                      | -        |
+| `--board`      | `-B`  | Board type (required)                                      | -        |
 | `--erase`      | `-E`  | Erase flash before flashing                                | `false`  |
 | `--no-auto`    | `-N`  | Disable auto-flash (just detect devices)                   | `false`  |
 | `--post-flash` | `-P`  | Serial command to send after flashing (can use multiple times) | -        |
