@@ -55,12 +55,7 @@ def create_argument_parser(channel: str = "stable") -> argparse.ArgumentParser:
         "-V",
         help="Use specific firmware version (overrides channel selection)",
     )
-    parser.add_argument(
-        "--board",
-        "-B",
-        required=True,
-        help="Board type (required)"
-    )
+    parser.add_argument("--board", "-B", required=True, help="Board type (required)")
     parser.add_argument(
         "--erase",
         "-E",

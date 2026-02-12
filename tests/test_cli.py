@@ -166,9 +166,7 @@ def test_argument_parser_version_overrides_channel():
     """Test that --version overrides --channel selection"""
     parser = create_argument_parser()
 
-    args = parser.parse_args(
-        ["--board", "test-board", "--channel", "beta", "--version", "2.7.0"]
-    )
+    args = parser.parse_args(["--board", "test-board", "--channel", "beta", "--version", "2.7.0"])
 
     assert args.version == "2.7.0"
     assert args.channel == "beta"  # Channel is still set but version takes precedence
