@@ -231,3 +231,74 @@ def test_execute_post_flash_commands(mock_sleep, mock_serial):
 
     # Verify serial was closed
     mock_ser_instance.close.assert_called_once()
+
+
+def test_flasher_initialization_with_version():
+    """Test AutoFlasher initialization with version parameter"""
+    flasher = AutoFlasher(
+        channel="stable",
+        board="test-board",
+        version="2.7.0",
+    )
+    assert flasher.version == "2.7.0"
+    assert flasher.channel == "stable"
+    assert flasher.board == "test-board"
+
+
+def test_flasher_version_is_optional():
+    """Test that version parameter is optional"""
+    flasher = AutoFlasher(
+        channel="stable",
+        board="test-board",
+    )
+    assert flasher.version is None
+
+
+@patch("openshock_autoflasher.flasher.requests.get")
+def test_fetch_version_with_specified_version(mock_get, flasher):
+    """Test that fetch_version returns specified version without network call"""
+    flasher_with_version = AutoFlasher(
+        channel="stable",
+        board="test-board",
+        version="2.7.0",
+    )
+
+    version = flasher_with_version.fetch_version()
+    assert version == "2.7.0"
+    # Verify no network request was made
+    mock_get.assert_not_called()
+
+
+@patch("openshock_autoflasher.flasher.requests.get")
+def test_fetch_version_without_specified_version(mock_get, flasher):
+    """Test that fetch_version makes network call when version not specified"""
+    mock_response = Mock()
+    mock_response.text = "1.5.0\n"
+    mock_response.raise_for_status = Mock()
+    mock_get.return_value = mock_response
+
+    version = flasher.fetch_version()
+    assert version == "1.5.0"
+    # Verify network request was made
+    mock_get.assert_called_once()
+
+
+def test_flasher_with_version_and_all_options():
+    """Test AutoFlasher with version and other options"""
+    flasher = AutoFlasher(
+        channel="beta",
+        board="esp32-s3",
+        version="2.7.0",
+        erase_flash=True,
+        auto_flash=False,
+        post_flash_commands=["help", "version"],
+        alert=True,
+    )
+
+    assert flasher.version == "2.7.0"
+    assert flasher.channel == "beta"
+    assert flasher.board == "esp32-s3"
+    assert flasher.erase_flash is True
+    assert flasher.auto_flash is False
+    assert flasher.post_flash_commands == ["help", "version"]
+    assert flasher.alert is True

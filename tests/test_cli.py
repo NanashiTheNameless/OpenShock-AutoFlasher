@@ -70,7 +70,7 @@ def test_argument_parser_short_options():
     """Test parser with short option flags"""
     parser = create_argument_parser()
 
-    args = parser.parse_args(["-c", "beta", "-b", "my-board", "-e", "-n"])
+    args = parser.parse_args(["-C", "beta", "-B", "my-board", "-E", "-N"])
 
     assert args.channel == "beta"
     assert args.board == "my-board"
@@ -137,6 +137,48 @@ def test_argument_parser_post_flash_short_option():
     """Test parser with post-flash short option"""
     parser = create_argument_parser()
 
-    args = parser.parse_args(["-b", "test-board", "-p", "command1", "-p", "command2"])
+    args = parser.parse_args(["-B", "test-board", "-P", "command1", "-P", "command2"])
 
     assert args.post_flash == ["command1", "command2"]
+
+
+def test_argument_parser_version_long_option():
+    """Test parser with --version long option"""
+    parser = create_argument_parser()
+
+    args = parser.parse_args(["--board", "test-board", "--version", "2.7.0"])
+
+    assert args.version == "2.7.0"
+    assert args.board == "test-board"
+
+
+def test_argument_parser_version_short_option():
+    """Test parser with -V short option"""
+    parser = create_argument_parser()
+
+    args = parser.parse_args(["-B", "test-board", "-V", "2.8.1"])
+
+    assert args.version == "2.8.1"
+    assert args.board == "test-board"
+
+
+def test_argument_parser_version_overrides_channel():
+    """Test that --version overrides --channel selection"""
+    parser = create_argument_parser()
+
+    args = parser.parse_args(
+        ["--board", "test-board", "--channel", "beta", "--version", "2.7.0"]
+    )
+
+    assert args.version == "2.7.0"
+    assert args.channel == "beta"  # Channel is still set but version takes precedence
+
+
+def test_argument_parser_version_is_optional():
+    """Test that --version is optional"""
+    parser = create_argument_parser()
+
+    args = parser.parse_args(["--board", "test-board"])
+
+    assert args.version is None
+    assert args.board == "test-board"
