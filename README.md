@@ -2,6 +2,9 @@
 
 [![PyPI - Version](https://img.shields.io/pypi/v/OpenShock-AutoFlasher)](https://pypi.org/project/OpenShock-AutoFlasher/)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/OpenShock-AutoFlasher)](https://pypi.org/project/OpenShock-AutoFlasher/)
+[![PyPI - Implementation](https://img.shields.io/pypi/implementation/OpenShock-AutoFlasher)](https://pypi.org/project/OpenShock-AutoFlasher/)
+[![PyPI - Types](https://img.shields.io/pypi/types/OpenShock-AutoFlasher)](https://pypi.org/project/OpenShock-AutoFlasher/)
+
 [![Tests](https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/workflows/Tests/badge.svg)](https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/actions/workflows/test.yml)
 [![GitHub License](https://img.shields.io/github/license/NanashiTheNameless/OpenShock-AutoFlasher)](https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/blob/main/LICENSE)
 
