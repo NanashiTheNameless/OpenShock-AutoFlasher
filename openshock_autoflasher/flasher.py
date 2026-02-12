@@ -42,6 +42,7 @@ class AutoFlasher:
         auto_flash: bool = True,
         post_flash_commands: Optional[List[str]] = None,
         alert: bool = False,
+        version: Optional[str] = None,
     ) -> None:
         self.channel: str = channel
         self.board: Optional[str] = board
@@ -49,6 +50,7 @@ class AutoFlasher:
         self.auto_flash: bool = auto_flash
         self.post_flash_commands: List[str] = post_flash_commands or []
         self.alert: bool = alert
+        self.version: Optional[str] = version
         self.base_url: str = BASE_URL
         self.known_ports: Set[str] = set()
         self.state: str = "waiting"
@@ -114,7 +116,10 @@ class AutoFlasher:
             )
 
     def fetch_version(self) -> str:
-        """Fetch latest version for the selected channel (cached)"""
+        """Fetch latest version for the selected channel (cached), or use specified version"""
+        if self.version:
+            self.log(f"Using specified version: {self.version}")
+            return self.version
         if self.version_cache:
             return self.version_cache
         url = f"{self.base_url}/version-{self.channel}.txt"

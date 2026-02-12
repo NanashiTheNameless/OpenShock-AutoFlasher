@@ -45,27 +45,32 @@ def create_argument_parser(channel: str = "stable") -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--channel",
-        "-c",
+        "-C",
         choices=["stable", "beta", "develop"],
         default="stable",
         help="Firmware channel (default: stable)",
     )
+    parser.add_argument(
+        "--version",
+        "-V",
+        help="Use specific firmware version (overrides channel selection)",
+    )
     parser.add_argument("--board", "-b", required=True, help="Board type (required)")
     parser.add_argument(
         "--erase",
-        "-e",
+        "-E",
         action="store_true",
         help="Erase flash before flashing",
     )
     parser.add_argument(
         "--no-auto",
-        "-n",
+        "-N",
         action="store_true",
         help="Disable auto-flash (just detect devices)",
     )
     parser.add_argument(
         "--post-flash",
-        "-p",
+        "-P",
         action="append",
         help=(
             "Serial command to send to device after flashing "
@@ -124,6 +129,7 @@ def main() -> None:
         auto_flash=not args.no_auto,
         post_flash_commands=args.post_flash or [],
         alert=args.alert,
+        version=args.version,
     )
 
     flasher.run()

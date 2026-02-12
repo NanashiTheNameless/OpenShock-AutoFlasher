@@ -79,18 +79,20 @@ View available boards for different channels:
 ```bash
 OPSH-AutoFlash --help                        # Shows boards for stable channel
 OPSH-AutoFlash --channel beta --help         # Shows boards for beta channel
-OPSH-AutoFlash -c develop --help             # Shows boards for develop channel
+OPSH-AutoFlash -C develop --help             # Shows boards for develop channel
 ```
 
 ### Command-Line Options
 
 | Option         | Short | Description                                                | Default  |
 |----------------|-------|------------------------------------------------------------|----------|
-| `--channel`    | `-c`  | Firmware channel: `stable`, `beta`, or `develop`           | `stable` |
+| `--channel`    | `-C`  | Firmware channel: `stable`, `beta`, or `develop`           | `stable` |
+| `--version`    | `-V`  | Use specific firmware version (overrides channel)          | -        |
 | `--board`      | `-b`  | Board type (required)                                      | -        |
-| `--erase`      | `-e`  | Erase flash before flashing                                | `false`  |
-| `--no-auto`    | `-n`  | Disable auto-flash (just detect devices)                   | `false`  |
-| `--post-flash` | `-p`  | Serial command to send after flashing (can use multiple times) | -        |
+| `--erase`      | `-E`  | Erase flash before flashing                                | `false`  |
+| `--no-auto`    | `-N`  | Disable auto-flash (just detect devices)                   | `false`  |
+| `--post-flash` | `-P`  | Serial command to send after flashing (can use multiple times) | -        |
+| `--alert`      | `-A`  | Beep audibly when flashing completes                       | `false`  |
 
 ### Examples
 
@@ -98,6 +100,12 @@ OPSH-AutoFlash -c develop --help             # Shows boards for develop channel
 
 ```bash
 OPSH-AutoFlash --board Wemos-D1-Mini-ESP32
+```
+
+**Flash with specific firmware version:**
+
+```bash
+OPSH-AutoFlash --version 1.4.0 --board Wemos-D1-Mini-ESP32
 ```
 
 **Flash with beta firmware and erase existing data:**
@@ -115,10 +123,10 @@ OPSH-AutoFlash --board Wemos-D1-Mini-ESP32 \
   --post-flash "status"
 ```
 
-**Use development firmware:**
+**Use development firmware with audio alert:**
 
 ```bash
-OPSH-AutoFlash --channel develop --board Wemos-D1-Mini-ESP32
+OPSH-AutoFlash --channel develop --board Wemos-D1-Mini-ESP32 --alert
 ```
 
 **Detect devices without auto-flashing:**
