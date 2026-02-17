@@ -87,15 +87,15 @@ OPSH-AutoFlash -C develop --help             # Shows boards for develop channel
 
 ### Command-Line Options
 
-| Option         | Short | Description                                                | Default  |
-|----------------|-------|------------------------------------------------------------|----------|
-| `--channel`    | `-C`  | Firmware channel: `stable`, `beta`, or `develop`           | `stable` |
-| `--version`    | `-V`  | Use specific firmware version (overrides channel)          | -        |
-| `--board`      | `-B`  | Board type (required)                                      | -        |
-| `--erase`      | `-E`  | Erase flash before flashing                                | `false`  |
-| `--no-auto`    | `-N`  | Disable auto-flash (just detect devices)                   | `false`  |
+| Option         | Short | Description                                                    | Default  |
+|----------------|-------|----------------------------------------------------------------|----------|
+| `--channel`    | `-C`  | Firmware channel: `stable`, `beta`, or `develop`               | `stable` |
+| `--version`    | `-V`  | Use specific firmware version (overrides channel)              | -        |
+| `--board`      | `-B`  | Board type (required)                                          | -        |
+| `--erase`      | `-E`  | Erase flash before flashing                                    | `false`  |
+| `--no-auto`    | `-N`  | Disable auto-flash (just detect devices)                       | `false`  |
 | `--post-flash` | `-P`  | Serial command to send after flashing (can use multiple times) | -        |
-| `--alert`      | `-A`  | Beep audibly when flashing completes                       | `false`  |
+| `--alert`      | `-A`  | Beep audibly when flashing completes                           | `false`  |
 
 ### Examples
 
@@ -280,7 +280,7 @@ The project uses GitHub Actions for CI/CD:
 
 ## License
 
-This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). See [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). See [LICENSE](<https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/blob/main/LICENSE>)) file for details.
 
 ## Contributing
 
