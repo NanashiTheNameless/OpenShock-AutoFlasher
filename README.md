@@ -140,15 +140,16 @@ OPSH-AutoFlash --board Wemos-D1-Mini-ESP32 --no-auto
 
 ## How It Works
 
-1. **Fetches** the latest firmware version from firmware.openshock.org
-2. **Validates** the specified board type
-3. **Monitors** USB ports for newly connected devices
-4. **Downloads** firmware binary and checksum in parallel
-5. **Verifies** firmware integrity using SHA256
-6. **Flashes** the device using esptool
-7. **Verifies** the flash was successful
-8. **Executes** post-flash commands over serial (if specified)
-9. **Repeats** for additional devices (continuous mode)
+1. **Fetches** the latest firmware version from firmware.openshock.org (or uses specified version)
+2. **Validates** the specified board type against available boards
+3. **Initializes** known USB ports and begins monitoring
+4. **Detects** when new devices are connected
+5. **Downloads** firmware binary and checksum in parallel
+6. **Verifies** firmware integrity using SHA256 checksum
+7. **Optionally erases** flash memory (if `--erase` is specified)
+8. **Flashes** the device using esptool
+9. **Executes** post-flash commands over serial (if specified)
+10. **Repeats** for additional devices (continuous mode)
 
 The tool uses esptool with optimized settings and can send serial commands to the device after flashing for automated configuration or testing.
 
@@ -159,7 +160,7 @@ The tool supports multiple ESP32-based boards. To view the current list of avail
 ```bash
 OPSH-AutoFlash --help                        # Stable channel boards
 OPSH-AutoFlash --channel beta --help         # Beta channel boards
-OPSH-AutoFlash -c develop --help             # Develop channel boards
+OPSH-AutoFlash -C develop --help             # Develop channel boards
 ```
 
 Common board types include:
