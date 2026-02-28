@@ -1,56 +1,56 @@
 [project]
 name = "OpenShock-AutoFlasher"
-version = "0.1.6"
+version = "0.1.7"
 description = "Automatically flash OpenShock firmware to ESP32 devices"
 readme = "README.md"
-license = {text = "AGPL-3.0"}
+license = { text = "AGPL-3.0" }
 authors = [
-    { name = "NanashiTheNameless" },
-    { name = "NanashiTheNameless", email = "NanashiTheNameless@NamelessNanashi.dev" }
+  { name = "NanashiTheNameless" },
+  { name = "NanashiTheNameless", email = "NanashiTheNameless@NamelessNanashi.dev" },
 ]
 maintainers = [
-    { name = "NanashiTheNameless" },
-    { name = "NanashiTheNameless", email = "NanashiTheNameless@NamelessNanashi.dev" }
+  { name = "NanashiTheNameless" },
+  { name = "NanashiTheNameless", email = "NanashiTheNameless@NamelessNanashi.dev" },
 ]
 keywords = ["openshock", "esp32", "firmware", "flasher"]
 requires-python = ">=3.12"
 classifiers = [
-    "Development Status :: 4 - Beta",
-    "Environment :: Console",
-    "Topic :: System :: Hardware :: Universal Serial Bus (USB)",
-    "Intended Audience :: Developers",
-    "Intended Audience :: End Users/Desktop",
-    "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: GNU Affero General Public License v3",
-    "Natural Language :: English",
-    "Operating System :: MacOS",
-    "Operating System :: Microsoft :: Windows",
-    "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Topic :: Software Development :: Embedded Systems",
-    "Topic :: System :: Hardware",
-    "Topic :: Utilities",
-    "Typing :: Typed",
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Topic :: System :: Hardware :: Universal Serial Bus (USB)",
+  "Intended Audience :: Developers",
+  "Intended Audience :: End Users/Desktop",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: GNU Affero General Public License v3",
+  "Natural Language :: English",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Topic :: Software Development :: Embedded Systems",
+  "Topic :: System :: Hardware",
+  "Topic :: Utilities",
+  "Typing :: Typed",
 ]
 dependencies = [
-    "esptool>=5.1.0",
-    "pyserial>=3.5",
-    "requests>=2.32.5",
-    "rich>=14.3.2",
+  "esptool>=5.2.0",
+  "pyserial>=3.5",
+  "requests>=2.32.5",
+  "rich>=14.3.3",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.0.2",
-    "pytest-cov>=7.0.0",
-    "pytest-mock>=3.15.1",
-    "black>=26.1.0",
-    "flake8>=7.3.0",
-    "mypy>=1.19.1"
+  "pytest>=9.0.2",
+  "pytest-cov>=7.0.0",
+  "pytest-mock>=3.15.1",
+  "black>=26.1.0",
+  "flake8>=7.3.0",
+  "mypy>=1.19.1",
 ]
 
 [project.urls]
