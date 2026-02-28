@@ -108,7 +108,7 @@ OPSH-AutoFlash --board Wemos-D1-Mini-ESP32
 **Flash with specific firmware version:**
 
 ```bash
-OPSH-AutoFlash --version 1.4.0 --board Wemos-D1-Mini-ESP32
+OPSH-AutoFlash --version 1.5.0 --board Wemos-D1-Mini-ESP32
 ```
 
 **Flash with beta firmware and erase existing data:**
