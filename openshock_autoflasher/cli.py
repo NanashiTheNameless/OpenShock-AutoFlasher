@@ -106,7 +106,7 @@ def main() -> None:
     # Parse channel early to fetch correct boards list for help text
     channel = "stable"
     for i, arg in enumerate(sys.argv):
-        if arg in ["--channel", "-c"] and i + 1 < len(sys.argv):
+        if arg in ["--channel", "-C"] and i + 1 < len(sys.argv):
             candidate = sys.argv[i + 1]
             if candidate in ["stable", "beta", "develop"]:
                 channel = candidate
