@@ -98,7 +98,6 @@ We actively welcome pull requests! Here's how to contribute code:
 - Update documentation for new features
 - Keep README.md current with changes
 - Add docstrings to public functions and classes
-- Update CHANGELOG.md with significant changes
 
 ## Pull Request Process
 
