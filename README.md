@@ -177,6 +177,7 @@ Common board types include:
 - `DFRobot-Firebeetle2-ESP32E`
 - `OpenShock-Core-V1`
 - `OpenShock-Core-V2`
+- `NodeMCU-32S`
 
 **Note:** Different channels may have different board support. Always check the help output for your selected channel.
 
