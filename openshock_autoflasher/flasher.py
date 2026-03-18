@@ -241,7 +241,7 @@ class AutoFlasher:
                     if line.startswith(">"):
                         line = line[1:].strip()
                         if line.startswith(cmd):
-                            line = line[len(cmd):].strip()
+                            line = line[len(cmd) :].strip()
                     if line:
                         response_lines.append(line)
 
