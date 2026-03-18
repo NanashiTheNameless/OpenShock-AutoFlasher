@@ -205,7 +205,7 @@ class AutoFlasher:
             # Give device time to reboot after flash
             time.sleep(2)
 
-            ser = serial.Serial(port, 115200, timeout=2)
+            ser = serial.Serial(port, 115200, timeout=0.1)
             time.sleep(0.5)  # Allow connection to stabilize
 
             # Clear any buffered data
@@ -214,20 +214,34 @@ class AutoFlasher:
 
             cmd_total = len(self.post_flash_commands)
             for i, cmd in enumerate(self.post_flash_commands, 1):
+                # Discard any leftover output from previous command
+                ser.reset_input_buffer()
+
                 self.log(f"[{i}/{cmd_total}] Sending: {cmd}")
 
                 # Send command with newline
                 ser.write((cmd + "\n").encode("utf-8"))
                 ser.flush()
 
-                # Wait a bit for command to execute
-                time.sleep(0.5)
+                # Wait for the echo to arrive, then discard it so we only
+                # capture the device's actual response
+                time.sleep(0.15)
+                ser.reset_input_buffer()
 
-                # Read any response
-                if ser.in_waiting > 0:
-                    response = ser.read(ser.in_waiting).decode("utf-8", errors="ignore").strip()
-                    if response:
-                        self.log(f"Response: {response}")
+                # Read response: stop after 100ms of silence or 2s total
+                response_bytes = bytearray()
+                deadline = time.monotonic() + 2.0
+                while time.monotonic() < deadline:
+                    chunk = ser.read(ser.in_waiting or 1)
+                    if chunk:
+                        response_bytes.extend(chunk)
+                    else:
+                        # 100ms of silence — device finished responding
+                        break
+
+                response = response_bytes.decode("utf-8", errors="ignore").strip()
+                if response:
+                    self.log(f"Response: {response}")
 
             ser.close()
             self.log("✓ Post-flash commands completed")
