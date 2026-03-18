@@ -27,7 +27,7 @@ A clear and concise description of what the bug is.
 
 - **OS**: [e.g., Ubuntu 22.04, Windows 11, macOS 13]
 - **Python Version**: [e.g., 3.14.0]
-- **Tool Version**: [e.g., 0.1.10]
+- **Tool Version**: [e.g., 0.1.11]
 - **USB Device**: [e.g., Wemos-D1-Mini-ESP32]
 
 ## Error Output

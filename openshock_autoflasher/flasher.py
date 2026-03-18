@@ -3,6 +3,7 @@ Core flashing logic for OpenShock Auto-Flasher
 """
 
 import hashlib
+import importlib.metadata
 import tempfile
 import textwrap
 import time
@@ -248,7 +249,7 @@ class AutoFlasher:
                 if attempt < retries:
                     self.log(
                         f"⚠ {operation} transport dropped, retrying "
-                        f"({attempt + 1}/{retries + 1})..."
+                        f"({attempt + 1}/{retries})..."
                     )
                     time.sleep(1)
                     continue
@@ -258,7 +259,7 @@ class AutoFlasher:
                 if attempt < retries and "Resource temporarily unavailable" in str(e):
                     self.log(
                         f"⚠ {operation} port busy (resetting device), retrying "
-                        f"({attempt + 1}/{retries + 1})..."
+                        f"({attempt + 1}/{retries})..."
                     )
                     time.sleep(2)  # Longer delay for device reset
                     continue
@@ -381,19 +382,20 @@ class AutoFlasher:
         """Main run loop"""
         self.set_state("waiting")
 
-        # Print header with background
-        self.log("OpenShock Auto-Flasher")
-        self.log("=" * 60)
-        self.log(f"Channel: {self.channel}")
-        self.log(f"Erase flash: {self.erase_flash}")
-        self.log(f"Auto-flash: {self.auto_flash}")
-        self.log("=" * 60)
-        self.log("")
-
         # Fetch version and boards
         try:
             version = self.fetch_version()
             boards = self.fetch_boards(version)
+
+            # Print header with background
+            _pkg_version = importlib.metadata.version("OpenShock-AutoFlasher")
+            self.log(f"OpenShock Auto-Flasher v{_pkg_version}")
+            self.log("=" * 60)
+            self.log(f"Channel: {self.channel}")
+            self.log(f"Erase flash: {self.erase_flash}")
+            self.log(f"Auto-flash: {self.auto_flash}")
+            self.log("=" * 60)
+            self.log("")
 
             # Early validation: check board exists before waiting
             if self.board not in boards:
