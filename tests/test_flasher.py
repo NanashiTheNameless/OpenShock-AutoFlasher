@@ -221,7 +221,7 @@ def test_execute_post_flash_commands(mock_sleep, mock_serial):
     flasher.execute_post_flash_commands("/dev/ttyUSB0")
 
     # Verify serial was opened
-    mock_serial.assert_called_once_with("/dev/ttyUSB0", 115200, timeout=2)
+    mock_serial.assert_called_once_with("/dev/ttyUSB0", 115200, timeout=0.2)
 
     # Verify commands were sent
     assert mock_ser_instance.write.call_count == 3

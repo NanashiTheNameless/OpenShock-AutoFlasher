@@ -205,7 +205,7 @@ class AutoFlasher:
             # Give device time to reboot after flash
             time.sleep(2)
 
-            ser = serial.Serial(port, 115200, timeout=0.1)
+            ser = serial.Serial(port, 115200, timeout=0.2)
             time.sleep(0.5)  # Allow connection to stabilize
 
             # Clear any buffered data
@@ -223,25 +223,30 @@ class AutoFlasher:
                 ser.write((cmd + "\n").encode("utf-8"))
                 ser.flush()
 
-                # Wait for the echo to arrive, then discard it so we only
-                # capture the device's actual response
-                time.sleep(0.15)
-                ser.reset_input_buffer()
-
-                # Read response: stop after 100ms of silence or 2s total
-                response_bytes = bytearray()
+                # Read response lines: stop after 200ms of silence or 2s total.
+                # Skip lines that are the command echo (shell prompts like "> cmd").
+                response_lines = []
                 deadline = time.monotonic() + 2.0
+                raw = bytearray()
                 while time.monotonic() < deadline:
-                    chunk = ser.read(ser.in_waiting or 1)
-                    if chunk:
-                        response_bytes.extend(chunk)
-                    else:
-                        # 100ms of silence — device finished responding
+                    byte = ser.read(1)
+                    if not byte:
                         break
+                    raw.extend(byte)
 
-                response = response_bytes.decode("utf-8", errors="ignore").strip()
-                if response:
-                    self.log(f"Response: {response}")
+                for line in raw.decode("utf-8", errors="ignore").splitlines():
+                    line = line.strip()
+                    if not line or line == cmd:
+                        continue
+                    if line.startswith(">"):
+                        line = line[1:].strip()
+                        if line.startswith(cmd):
+                            line = line[len(cmd):].strip()
+                    if line:
+                        response_lines.append(line)
+
+                if response_lines:
+                    self.log(f"Response: {' '.join(response_lines)}")
 
             ser.close()
             self.log("✓ Post-flash commands completed")
