@@ -302,3 +302,24 @@ def test_flasher_with_version_and_all_options():
     assert flasher.auto_flash is False
     assert flasher.post_flash_commands == ["help", "version"]
     assert flasher.alert is True
+
+
+@patch("openshock_autoflasher.flasher.time.sleep")
+@patch("openshock_autoflasher.flasher.esptool.main")
+def test_run_esptool_retries_on_stopiteration(mock_esptool_main, mock_sleep, flasher):
+    """Test transient StopIteration gets retried and succeeds."""
+    mock_esptool_main.side_effect = [StopIteration(), None]
+
+    flasher._run_esptool(["erase-flash"], "Erase")
+
+    assert mock_esptool_main.call_count == 2
+    mock_sleep.assert_called_once_with(1)
+
+
+@patch("openshock_autoflasher.flasher.esptool.main")
+def test_run_esptool_raises_on_repeated_stopiteration(mock_esptool_main, flasher):
+    """Test repeated StopIteration raises a clear operation error."""
+    mock_esptool_main.side_effect = [StopIteration(), StopIteration()]
+
+    with pytest.raises(Exception, match="Erase failed after retry"):
+        flasher._run_esptool(["erase-flash"], "Erase")

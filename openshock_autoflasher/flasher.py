@@ -236,6 +236,38 @@ class AutoFlasher:
             self.log(f"⚠ Warning: Post-flash command execution failed: {e}")
             self.log("Continuing anyway...")
 
+    def _run_esptool(self, args: List[str], operation: str, retries: int = 1) -> None:
+        """Run esptool with a small retry window for transient disconnects."""
+        for attempt in range(retries + 1):
+            try:
+                esptool.main(args)
+                return
+            except StopIteration as e:
+                # Some esptool/serial combinations can briefly drop transport
+                # while the chip resets between phases.
+                if attempt < retries:
+                    self.log(
+                        f"⚠ {operation} transport dropped, retrying "
+                        f"({attempt + 1}/{retries + 1})..."
+                    )
+                    time.sleep(1)
+                    continue
+                raise Exception(f"{operation} failed after retry: {e}") from e
+            except esptool.util.FatalError as e:
+                # Port lock errors (EAGAIN 11) during reset; wait and retry.
+                if attempt < retries and "Resource temporarily unavailable" in str(e):
+                    self.log(
+                        f"⚠ {operation} port busy (resetting device), retrying "
+                        f"({attempt + 1}/{retries + 1})..."
+                    )
+                    time.sleep(2)  # Longer delay for device reset
+                    continue
+                raise Exception(f"{operation} failed: {e}") from e
+            except SystemExit as e:
+                if e.code == 0:
+                    return
+                raise Exception(f"{operation} failed: {e}") from e
+
     def flash_device(self, port: str, version: str, board: str) -> None:
         """Flash firmware to device"""
         temp_firmware: Optional[Path] = None
@@ -283,13 +315,7 @@ class AutoFlasher:
                     "erase-flash",
                 ]
 
-                try:
-                    esptool.main(erase_args)
-                except (SystemExit, esptool.util.FatalError) as e:
-                    if isinstance(e, SystemExit) and e.code == 0:
-                        pass
-                    else:
-                        raise Exception(f"Erase failed: {e}")
+                self._run_esptool(erase_args, "Erase", retries=2)
 
                 self.log("✓ Erase complete")
 
@@ -308,13 +334,7 @@ class AutoFlasher:
 
             self.log("Flashing firmware...")
 
-            try:
-                esptool.main(args)
-            except (SystemExit, esptool.util.FatalError) as e:
-                if isinstance(e, SystemExit) and e.code == 0:
-                    pass
-                else:
-                    raise Exception(f"Flash failed: {e}")
+            self._run_esptool(args, "Flash")
 
             # Execute post-flash commands if any
             if self.post_flash_commands:
