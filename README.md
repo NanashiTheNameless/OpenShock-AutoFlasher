@@ -95,6 +95,7 @@ OPSH-AutoFlash -C develop --help             # Shows boards for develop channel
 | `--erase`      | `-E`  | Erase flash before flashing                                    | `false`  |
 | `--no-auto`    | `-N`  | Disable auto-flash (just detect devices)                       | `false`  |
 | `--post-flash` | `-P`  | Serial command to send after flashing (can use multiple times) | -        |
+| `--post-flash-delay` | - | Milliseconds to wait between post-flash commands               | `0`      |
 | `--alert`      | `-A`  | Beep audibly when flashing completes                           | `false`  |
 
 ### Examples
@@ -123,6 +124,7 @@ OPSH-AutoFlash --channel beta --board Wemos-D1-Mini-ESP32 --erase
 OPSH-AutoFlash --board Wemos-D1-Mini-ESP32 \
   --post-flash "help" \
   --post-flash "version" \
+  --post-flash-delay 1500 \
   --post-flash "status"
 ```
 

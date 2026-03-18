@@ -27,6 +27,7 @@ def test_flasher_initialization(flasher):
     assert flasher.erase_flash is False
     assert flasher.auto_flash is True
     assert flasher.post_flash_commands == []
+    assert flasher.post_flash_delay == 0.0
     assert flasher.state == "waiting"
     assert flasher.version_cache is None
     assert flasher.boards_cache is None
@@ -201,6 +202,12 @@ def test_flasher_post_flash_commands():
     assert with_commands.post_flash_commands == ["cmd1", "cmd2"]
 
 
+def test_flasher_post_flash_delay():
+    """Test post_flash_delay initialization"""
+    flasher = AutoFlasher(channel="stable", board="test", post_flash_delay=1250)
+    assert flasher.post_flash_delay == 1250
+
+
 @patch("openshock_autoflasher.flasher.serial.Serial")
 @patch("openshock_autoflasher.flasher.time.sleep")
 def test_execute_post_flash_commands(mock_sleep, mock_serial):
@@ -231,6 +238,30 @@ def test_execute_post_flash_commands(mock_sleep, mock_serial):
 
     # Verify serial was closed
     mock_ser_instance.close.assert_called_once()
+
+
+@patch("openshock_autoflasher.flasher.serial.Serial")
+@patch("openshock_autoflasher.flasher.time.sleep")
+def test_execute_post_flash_commands_waits_between_commands(mock_sleep, mock_serial):
+    """Test post-flash delay in milliseconds is applied between commands only."""
+    flasher = AutoFlasher(
+        channel="stable",
+        board="test",
+        post_flash_commands=["cmd1", "cmd2", "cmd3"],
+        post_flash_delay=1500,
+    )
+
+    mock_ser_instance = MagicMock()
+    mock_serial.return_value = mock_ser_instance
+
+    flasher.execute_post_flash_commands("/dev/ttyUSB0")
+
+    assert mock_sleep.call_args_list == [
+        ((2,),),
+        ((0.5,),),
+        ((1.5,),),
+        ((1.5,),),
+    ]
 
 
 def test_flasher_initialization_with_version():
@@ -292,6 +323,7 @@ def test_flasher_with_version_and_all_options():
         erase_flash=True,
         auto_flash=False,
         post_flash_commands=["help", "version"],
+        post_flash_delay=750,
         alert=True,
     )
 
@@ -301,6 +333,7 @@ def test_flasher_with_version_and_all_options():
     assert flasher.erase_flash is True
     assert flasher.auto_flash is False
     assert flasher.post_flash_commands == ["help", "version"]
+    assert flasher.post_flash_delay == 750
     assert flasher.alert is True
 
 

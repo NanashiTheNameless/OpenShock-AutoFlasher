@@ -15,6 +15,14 @@ from .styles import console
 from .flasher import AutoFlasher
 
 
+def non_negative_float(value: str) -> float:
+    """Parse a non-negative float argument value."""
+    parsed_value = float(value)
+    if parsed_value < 0:
+        raise argparse.ArgumentTypeError("must be non-negative")
+    return parsed_value
+
+
 def fetch_boards_for_help(channel: str = "stable") -> List[str]:
     """Fetch boards list for help text"""
     try:
@@ -78,6 +86,13 @@ def create_argument_parser(channel: str = "stable") -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--post-flash-delay",
+        type=non_negative_float,
+        default=0.0,
+        metavar="milliseconds",
+        help="Milliseconds to wait between post-flash commands (default: 0)",
+    )
+    parser.add_argument(
         "--alert",
         "-A",
         action="store_true",
@@ -128,6 +143,7 @@ def main() -> None:
         erase_flash=args.erase,
         auto_flash=not args.no_auto,
         post_flash_commands=args.post_flash or [],
+        post_flash_delay=args.post_flash_delay,
         alert=args.alert,
         version=args.version,
     )

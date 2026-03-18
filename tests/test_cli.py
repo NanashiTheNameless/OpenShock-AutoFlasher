@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 from openshock_autoflasher.cli import (
     fetch_boards_for_help,
     create_argument_parser,
+    non_negative_float,
 )
 
 
@@ -50,6 +51,7 @@ def test_create_argument_parser():
     assert args.erase is False
     assert args.no_auto is False
     assert args.post_flash is None
+    assert args.post_flash_delay == 0.0
 
 
 def test_argument_parser_all_options():
@@ -140,6 +142,27 @@ def test_argument_parser_post_flash_short_option():
     args = parser.parse_args(["-B", "test-board", "-P", "command1", "-P", "command2"])
 
     assert args.post_flash == ["command1", "command2"]
+
+
+def test_argument_parser_post_flash_delay():
+    """Test parser with post-flash delay option in milliseconds"""
+    parser = create_argument_parser()
+
+    args = parser.parse_args(["--board", "test-board", "--post-flash-delay", "1500"])
+
+    assert args.post_flash_delay == 1500.0
+
+
+def test_non_negative_float_rejects_negative_values():
+    """Test negative post-flash delay values are rejected"""
+    with pytest.raises(SystemExit):
+        parser = create_argument_parser()
+        parser.parse_args(["--board", "test-board", "--post-flash-delay", "-1"])
+
+
+def test_non_negative_float_helper_accepts_zero():
+    """Test non-negative float helper accepts zero"""
+    assert non_negative_float("0") == 0.0
 
 
 def test_argument_parser_version_long_option():

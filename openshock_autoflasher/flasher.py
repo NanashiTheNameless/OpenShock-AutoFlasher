@@ -42,6 +42,7 @@ class AutoFlasher:
         erase_flash: bool = False,
         auto_flash: bool = True,
         post_flash_commands: Optional[List[str]] = None,
+        post_flash_delay: float = 0.0,
         alert: bool = False,
         version: Optional[str] = None,
     ) -> None:
@@ -50,6 +51,7 @@ class AutoFlasher:
         self.erase_flash: bool = erase_flash
         self.auto_flash: bool = auto_flash
         self.post_flash_commands: List[str] = post_flash_commands or []
+        self.post_flash_delay: float = post_flash_delay
         self.alert: bool = alert
         self.version: Optional[str] = version
         self.base_url: str = BASE_URL
@@ -247,6 +249,13 @@ class AutoFlasher:
 
                 if response_lines:
                     self.log(f"Response: {' '.join(response_lines)}")
+
+                if i < cmd_total and self.post_flash_delay > 0:
+                    delay_seconds = self.post_flash_delay / 1000
+                    self.log(
+                        "Waiting " f"{self.post_flash_delay:g}ms before next post-flash command..."
+                    )
+                    time.sleep(delay_seconds)
 
             ser.close()
             self.log("✓ Post-flash commands completed")
