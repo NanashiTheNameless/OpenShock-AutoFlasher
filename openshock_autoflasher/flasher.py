@@ -382,20 +382,20 @@ class AutoFlasher:
         """Main run loop"""
         self.set_state("waiting")
 
+        # Print header with background
+        _pkg_version = importlib.metadata.version("OpenShock-AutoFlasher")
+        self.log(f"OpenShock Auto-Flasher v{_pkg_version}")
+        self.log("=" * 60)
+        self.log(f"Channel: {self.channel}")
+        self.log(f"Erase flash: {self.erase_flash}")
+        self.log(f"Auto-flash: {self.auto_flash}")
+        self.log("=" * 60)
+        self.log("")
+
         # Fetch version and boards
         try:
             version = self.fetch_version()
             boards = self.fetch_boards(version)
-
-            # Print header with background
-            _pkg_version = importlib.metadata.version("OpenShock-AutoFlasher")
-            self.log(f"OpenShock Auto-Flasher v{_pkg_version}")
-            self.log("=" * 60)
-            self.log(f"Channel: {self.channel}")
-            self.log(f"Erase flash: {self.erase_flash}")
-            self.log(f"Auto-flash: {self.auto_flash}")
-            self.log("=" * 60)
-            self.log("")
 
             # Early validation: check board exists before waiting
             if self.board not in boards:
