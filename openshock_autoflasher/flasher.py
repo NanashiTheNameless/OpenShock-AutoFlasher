@@ -236,16 +236,31 @@ class AutoFlasher:
                         break
                     raw.extend(byte)
 
-                for line in raw.decode("utf-8", errors="ignore").splitlines():
-                    line = line.strip()
+                decoded = raw.decode("utf-8", errors="ignore")
+                # Normalize \r\n and bare \r to \n so splitlines doesn't
+                # duplicate content on carriage-return-only line endings.
+                decoded = decoded.replace("\r\n", "\n").replace("\r", "\n")
+                seen: Set[str] = set()
+                for line in decoded.splitlines():
+                    # Strip all non-printable characters (including null bytes that
+                    # .strip() won't remove), then trim whitespace.
+                    line = "".join(c for c in line if c.isprintable()).strip()
                     if not line or line == cmd:
+                        continue
+                    # Filter lines that are entirely one repeated character (e.g. "xxxxx...")
+                    if len(set(line)) == 1:
                         continue
                     if line.startswith(">"):
                         line = line[1:].strip()
                         if line.startswith(cmd):
                             line = line[len(cmd) :].strip()
-                    if line:
-                        response_lines.append(line)
+                    if not line:
+                        continue
+                    # Deduplicate identical lines (device can echo same line many times)
+                    if line in seen:
+                        continue
+                    seen.add(line)
+                    response_lines.append(line)
 
                 if response_lines:
                     self.log(f"Response: {' '.join(response_lines)}")
@@ -412,7 +427,7 @@ class AutoFlasher:
 
         # Print header with background
         _pkg_version = importlib.metadata.version("OpenShock-AutoFlasher")
-        self.log(f"OpenShock Auto-Flasher v{_pkg_version}")
+        self.log(f"OpenShock Auto-Flasher {_pkg_version}")
         self.log("=" * 60)
         self.log(f"Channel: {self.channel}")
         self.log(f"Erase flash: {self.erase_flash}")
