@@ -10,7 +10,7 @@ from typing import List
 import requests
 from rich.style import Style
 
-from .constants import BASE_URL
+from .constants import BASE_URL, SUPPORTED_CHIPS
 from .styles import console
 from .flasher import AutoFlasher
 
@@ -64,6 +64,12 @@ def create_argument_parser(channel: str = "stable") -> argparse.ArgumentParser:
         help="Use specific firmware version (overrides channel selection)",
     )
     parser.add_argument("--board", "-B", required=True, help="Board type (required)")
+    parser.add_argument(
+        "--chip",
+        choices=("auto", *SUPPORTED_CHIPS),
+        default="auto",
+        help="Target chip for esptool (default: auto)",
+    )
     parser.add_argument(
         "--erase",
         "-E",
@@ -146,6 +152,7 @@ def main() -> None:
         post_flash_delay=args.post_flash_delay,
         alert=args.alert,
         version=args.version,
+        chip=args.chip,
     )
 
     flasher.run()

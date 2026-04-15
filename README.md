@@ -92,6 +92,7 @@ OPSH-AutoFlash -C develop --help             # Shows boards for develop channel
 | `--channel`    | `-C`  | Firmware channel: `stable`, `beta`, or `develop`               | `stable` |
 | `--version`    | `-V`  | Use specific firmware version (overrides channel)              | -        |
 | `--board`      | `-B`  | Board type (required)                                          | -        |
+| `--chip`       | -     | Target chip for esptool                                        | `auto`   |
 | `--erase`      | `-E`  | Erase flash before flashing                                    | `false`  |
 | `--no-auto`    | `-N`  | Disable auto-flash (just detect devices)                       | `false`  |
 | `--post-flash` | `-P`  | Serial command to send after flashing (can use multiple times) | -        |
@@ -116,6 +117,12 @@ OPSH-AutoFlash --version 1.5.0 --board Wemos-D1-Mini-ESP32
 
 ```bash
 OPSH-AutoFlash --channel beta --board Wemos-D1-Mini-ESP32 --erase
+```
+
+**Flash with an explicit esptool chip:**
+
+```bash
+OPSH-AutoFlash --board Seeed-Xiao-ESP32C3 --chip esp32c3 --erase
 ```
 
 **Flash and send post-flash commands to device:**

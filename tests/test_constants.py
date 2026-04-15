@@ -9,6 +9,7 @@ from openshock_autoflasher.constants import (
     FLASH_MODE,
     FLASH_FREQ,
     FLASH_ADDRESS,
+    SUPPORTED_CHIPS,
     INITIAL_POLL_INTERVAL,
     MAX_POLL_INTERVAL,
     POLL_BACKOFF_THRESHOLD,
@@ -24,6 +25,7 @@ def test_constants_are_defined():
     assert FLASH_MODE in ["qio", "qout", "dio", "dout"]
     assert FLASH_FREQ.endswith("m")
     assert FLASH_ADDRESS.startswith("0x")
+    assert "esp32" in SUPPORTED_CHIPS
 
 
 def test_polling_intervals():

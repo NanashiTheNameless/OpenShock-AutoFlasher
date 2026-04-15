@@ -5,6 +5,7 @@ Tests for flasher module
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
+from openshock_autoflasher.constants import BAUD_RATE
 from openshock_autoflasher.flasher import AutoFlasher
 
 
@@ -335,6 +336,60 @@ def test_flasher_with_version_and_all_options():
     assert flasher.post_flash_commands == ["help", "version"]
     assert flasher.post_flash_delay == 750
     assert flasher.alert is True
+
+
+def test_flasher_defaults_chip_to_auto():
+    """Test AutoFlasher defaults to esptool autodetection."""
+    flasher = AutoFlasher(channel="stable", board="test-board")
+
+    assert flasher.chip == "auto"
+
+
+def test_flasher_with_explicit_chip():
+    """Test AutoFlasher stores explicit chip overrides."""
+    flasher = AutoFlasher(channel="stable", board="test-board", chip="ESP32S3")
+
+    assert flasher.chip == "esp32s3"
+
+
+def test_flasher_rejects_unsupported_chip():
+    """Test unsupported esptool chip values fail early."""
+    with pytest.raises(ValueError, match="Unsupported chip"):
+        AutoFlasher(channel="stable", board="test-board", chip="invalid")
+
+
+def test_flash_device_uses_default_auto_chip_for_erase_and_flash(flasher):
+    """Test erase and write commands both receive the default auto chip."""
+    flasher.erase_flash = True
+
+    with (
+        patch.object(flasher, "download_firmware", return_value=b"firmware"),
+        patch.object(flasher, "_run_esptool") as mock_run_esptool,
+    ):
+        flasher.flash_device("/dev/ttyUSB0", "1.0.0", "Seeed-Xiao-ESP32C3")
+
+    assert mock_run_esptool.call_count == 2
+    erase_args = mock_run_esptool.call_args_list[0][0][0]
+    write_args = mock_run_esptool.call_args_list[1][0][0]
+
+    assert erase_args == [
+        "--chip",
+        "auto",
+        "--port",
+        "/dev/ttyUSB0",
+        "--baud",
+        BAUD_RATE,
+        "erase-flash",
+    ]
+    assert write_args[:7] == [
+        "--chip",
+        "auto",
+        "--port",
+        "/dev/ttyUSB0",
+        "--baud",
+        BAUD_RATE,
+        "write-flash",
+    ]
 
 
 @patch("openshock_autoflasher.flasher.time.sleep")

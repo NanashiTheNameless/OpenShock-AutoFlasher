@@ -24,12 +24,25 @@ from .constants import (
     FLASH_MODE,
     FLASH_FREQ,
     FLASH_ADDRESS,
+    SUPPORTED_CHIPS,
     INITIAL_POLL_INTERVAL,
     MAX_POLL_INTERVAL,
     POLL_BACKOFF_THRESHOLD,
     DEVICE_INIT_DELAY,
 )
 from .styles import StateColors, console
+
+
+def normalize_chip(chip: Optional[str]) -> str:
+    """Normalize and validate an optional esptool chip value."""
+    if chip is None:
+        return "auto"
+
+    normalized_chip = chip.lower()
+    if normalized_chip != "auto" and normalized_chip not in SUPPORTED_CHIPS:
+        supported = ", ".join(("auto", *SUPPORTED_CHIPS))
+        raise ValueError(f"Unsupported chip '{chip}'. Supported chips: {supported}")
+    return normalized_chip
 
 
 class AutoFlasher:
@@ -45,6 +58,7 @@ class AutoFlasher:
         post_flash_delay: float = 0.0,
         alert: bool = False,
         version: Optional[str] = None,
+        chip: Optional[str] = None,
     ) -> None:
         self.channel: str = channel
         self.board: Optional[str] = board
@@ -54,6 +68,7 @@ class AutoFlasher:
         self.post_flash_delay: float = post_flash_delay
         self.alert: bool = alert
         self.version: Optional[str] = version
+        self.chip: str = normalize_chip(chip)
         self.base_url: str = BASE_URL
         self.known_ports: Set[str] = set()
         self.state: str = "waiting"
@@ -321,6 +336,7 @@ class AutoFlasher:
             self.log(f"Starting flash process for {board}")
             self.log(f"Port: {port}")
             self.log(f"Version: {version}")
+            self.log(f"Chip: {self.chip}")
             self.log("=" * 60)
 
             # Download firmware
@@ -339,23 +355,23 @@ class AutoFlasher:
             temp_file.close()
 
             # Prepare esptool arguments
-            args = [
+            base_args = [
+                "--chip",
+                self.chip,
                 "--port",
                 port,
                 "--baud",
                 BAUD_RATE,
-                "--chip",
-                "auto",
+            ]
+            args = [
+                *base_args,
                 "write-flash",
             ]
 
             if self.erase_flash:
                 self.log("Erasing flash...")
                 erase_args = [
-                    "--port",
-                    port,
-                    "--baud",
-                    BAUD_RATE,
+                    *base_args,
                     "erase-flash",
                 ]
 

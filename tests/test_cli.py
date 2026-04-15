@@ -52,6 +52,7 @@ def test_create_argument_parser():
     assert args.no_auto is False
     assert args.post_flash is None
     assert args.post_flash_delay == 0.0
+    assert args.chip == "auto"
 
 
 def test_argument_parser_all_options():
@@ -100,6 +101,17 @@ def test_argument_parser_channel_choices():
     # Invalid channel
     with pytest.raises(SystemExit):
         parser.parse_args(["--channel", "invalid", "--board", "test"])
+
+
+def test_argument_parser_chip_option():
+    """Test parser with explicit esptool chip selection."""
+    parser = create_argument_parser()
+
+    args = parser.parse_args(["--board", "test-board", "--chip", "esp32c3"])
+    assert args.chip == "esp32c3"
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--board", "test-board", "--chip", "invalid"])
 
 
 def test_argument_parser_post_flash_single():
