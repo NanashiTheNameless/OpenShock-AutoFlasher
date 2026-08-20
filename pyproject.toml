@@ -60,6 +60,7 @@ Issues = "https://github.com/NanashiTheNameless/OpenShock-AutoFlasher/issues"
 "GitHub Sponsor" = "https://github.com/sponsors/NanashiTheNameless"
 "Buy Me a Coffee" = "https://buymeacoffee.com/NamelessNanashi"
 Author = "https://github.com/NanashiTheNameless"
+"Liberapay" = "https://liberapay.com/NamelessNanashi"
 
 [project.scripts]
 OPSH-AutoFlash = "openshock_autoflasher.cli:main"
