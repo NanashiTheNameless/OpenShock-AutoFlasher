@@ -1,9 +1,14 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "OpenShock-AutoFlasher"
-version = "0.4.0"
+version = "0.4.1"
 description = "Automatically flash OpenShock firmware to ESP32 devices"
 readme = "README.md"
-license = { text = "AGPL-3.0" }
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
 authors = [
   { name = "NanashiTheNameless" },
   { name = "NanashiTheNameless", email = "NanashiTheNameless@NamelessNanashi.dev" },
@@ -21,7 +26,6 @@ classifiers = [
   "Intended Audience :: Developers",
   "Intended Audience :: End Users/Desktop",
   "Intended Audience :: System Administrators",
-  "License :: OSI Approved :: GNU Affero General Public License v3",
   "Natural Language :: English",
   "Operating System :: MacOS",
   "Operating System :: Microsoft :: Windows",
