@@ -35,6 +35,25 @@ def test_flasher_initialization(flasher):
     assert flasher.boards_cache is None
 
 
+@pytest.mark.parametrize("installed", [True, False])
+def test_run_handles_missing_package_metadata(flasher, installed):
+    from importlib.metadata import PackageNotFoundError
+
+    flasher.test_only = True
+    with (
+        patch(
+            "openshock_autoflasher.flasher.importlib.metadata.version",
+            return_value="0.4.0",
+            side_effect=None if installed else PackageNotFoundError("OpenShock-AutoFlasher"),
+        ),
+        patch.object(flasher, "detect_new_port", side_effect=KeyboardInterrupt()),
+        patch.object(flasher, "log") as log,
+    ):
+        flasher.run()
+    version = "0.4.0" if installed else "unknown (not installed)"
+    log.assert_any_call(f"OpenShock Auto-Flasher {version}")
+
+
 def test_get_style(flasher):
     """Test style getter returns correct styles"""
     from openshock_autoflasher.styles import StateColors

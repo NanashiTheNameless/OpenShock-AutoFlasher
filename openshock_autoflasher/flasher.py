@@ -733,7 +733,10 @@ class AutoFlasher:
         self.set_state("waiting")
 
         # Print header with background
-        _pkg_version = importlib.metadata.version("OpenShock-AutoFlasher")
+        try:
+            _pkg_version = importlib.metadata.version("OpenShock-AutoFlasher")
+        except importlib.metadata.PackageNotFoundError:
+            _pkg_version = "unknown (not installed)"
         self.log(f"OpenShock Auto-Flasher {_pkg_version}")
         self.log("=" * 60)
         self.log(f"Channel: {self.channel}")

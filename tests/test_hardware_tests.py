@@ -1,8 +1,9 @@
 """Hardware protocol regression tests; no connected devices or network required."""
 
 from collections import deque
+from contextlib import contextmanager
 import json
-from threading import Event, enumerate as enumerate_threads
+from threading import Event, Lock, enumerate as enumerate_threads
 from time import sleep as real_sleep
 from unittest.mock import Mock
 
@@ -13,10 +14,13 @@ from openshock_autoflasher import hardware_tests as hw
 
 class Clock:
     now = 0.0
+    reader_drained = None
 
     def monotonic(self):
-        # Give the asynchronous serial reader time to run as virtual time advances.
-        real_sleep(0)
+        # Do not expire a virtual deadline while the real reader is still processing
+        # already supplied bytes. sleep(0) does not guarantee it gets scheduled.
+        if self.reader_drained is not None:
+            assert self.reader_drained.wait(5), "RF reader did not drain the fake serial input"
         self.now += 0.01
         return self.now
 
@@ -30,9 +34,14 @@ class FakeSerial:
         self.data = deque()
         self.writes = []
         self.closed = False
+        self.lock = Lock()
+        self.drained = Event()
+        self.drained.set()
 
     def feed(self, text):
-        self.data.extend(bytes([byte]) for byte in text.encode())
+        with self.lock:
+            self.drained.clear()
+            self.data.extend(bytes([byte]) for byte in text.encode())
 
     def open(self):
         self.closed = False
@@ -41,7 +50,9 @@ class FakeSerial:
         self.closed = True
 
     def reset_input_buffer(self):
-        self.data.clear()
+        with self.lock:
+            self.data.clear()
+            self.drained.set()
 
     def write(self, data):
         self.writes.append(data)
@@ -49,8 +60,12 @@ class FakeSerial:
         return len(data)
 
     def read(self, _size):
-        if self.data:
-            return self.data.popleft()
+        with self.lock:
+            if self.data:
+                return self.data.popleft()
+            # The previous byte has been parsed and any completed line enqueued
+            # before the reader asks for another byte.
+            self.drained.set()
         # Real serial reads block until input arrives or their timeout expires.
         real_sleep(0.0001)
         return b""
@@ -66,6 +81,18 @@ def rig(monkeypatch):
     monkeypatch.setattr(hw.secrets, "SystemRandom", lambda: rng)
     state = {"rf": True, "ap": True}
     monitor = FakeSerial(lambda *_: None)
+    monitor_lines = hw._monitor_lines
+
+    @contextmanager
+    def synchronized_monitor_lines(session):
+        with monitor_lines(session) as lines:
+            clock.reader_drained = monitor.drained
+            try:
+                yield lines
+            finally:
+                clock.reader_drained = None
+
+    monkeypatch.setattr(hw, "_monitor_lines", synchronized_monitor_lines)
     monkeypatch.setattr(hw, "read_ap_ssid", lambda port: "OpenShock-AA:BB:CC:DD:EE:FF")
     monkeypatch.setattr(hw, "scan_ap", lambda *args, **kwargs: state["ap"])
 
@@ -574,6 +601,23 @@ def test_rf_is_consumed_before_hub_acknowledgement(rig):
     result = hw.run_hardware_tests("dut", config(rf_port="monitor"), lambda _: None)
     assert result.passed, result.checks[0].detail
     assert not any(thread.name == "rf-monitor-reader" for thread in enumerate_threads())
+
+
+def test_rf_clock_waits_for_delayed_reader(rig):
+    _, _, monitor = rig
+    read = monitor.read
+    first_read = True
+
+    def delayed_read(size):
+        nonlocal first_read
+        if first_read:
+            first_read = False
+            real_sleep(0.1)
+        return read(size)
+
+    monitor.read = delayed_read
+    result = hw.run_hardware_tests("dut", config(rf_port="monitor"), lambda _: None)
+    assert result.passed, result.checks[0].detail
 
 
 @pytest.mark.parametrize("failure", ["ack", "receiver", "timeout"])
