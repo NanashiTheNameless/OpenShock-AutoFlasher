@@ -129,6 +129,9 @@ dmypy.json
 # Temporary firmware files
 OpenShock_Firmware_*.bin
 
+# Session reports
+OpenShock-session-*.html
+.openshock-report-*
+
 # Ruff cache
 .ruff_cache
-

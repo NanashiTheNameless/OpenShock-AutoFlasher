@@ -7,9 +7,11 @@ import importlib.metadata
 import tempfile
 import textwrap
 import time
+from contextlib import contextmanager, nullcontext
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from pathlib import Path
-from typing import Optional, List, Set
+from typing import Any, Iterator, Optional, List, Set
 
 import esptool
 import esptool.util
@@ -31,6 +33,16 @@ from .constants import (
     DEVICE_INIT_DELAY,
 )
 from .styles import StateColors, console
+from .report import SessionReport, capture_identity
+from .wifi import read_ap_ssid
+from .hardware_tests import (
+    CheckResult,
+    HardwareTestConfig,
+    HardwareTestError,
+    HardwareTestResult,
+    run_hardware_tests,
+    same_port,
+)
 
 
 def normalize_chip(chip: Optional[str]) -> str:
@@ -59,16 +71,24 @@ class AutoFlasher:
         alert: bool = False,
         version: Optional[str] = None,
         chip: Optional[str] = None,
+        hardware_tests: Optional[HardwareTestConfig] = None,
+        test_only: bool = False,
+        session_report: Optional[SessionReport] = None,
     ) -> None:
         self.channel: str = channel
         self.board: Optional[str] = board
         self.erase_flash: bool = erase_flash
-        self.auto_flash: bool = auto_flash
+        self.test_only: bool = test_only
+        self.auto_flash: bool = auto_flash and not test_only
         self.post_flash_commands: List[str] = post_flash_commands or []
         self.post_flash_delay: float = post_flash_delay
         self.alert: bool = alert
         self.version: Optional[str] = version
         self.chip: str = normalize_chip(chip)
+        self.hardware_tests = hardware_tests or HardwareTestConfig()
+        self.session_report = session_report
+        self._record: Optional[dict[str, Any]] = None
+        self.rf_monitor_identity: Optional[tuple[Optional[int], Optional[int], str]] = None
         self.base_url: str = BASE_URL
         self.known_ports: Set[str] = set()
         self.state: str = "waiting"
@@ -87,6 +107,93 @@ class AutoFlasher:
             "error": StateColors.ERROR,
         }
         return styles.get(self.state, StateColors.WAITING)
+
+    @contextmanager
+    def _report_device(
+        self, port: str, mode: str, firmware: str | None = None, board: str | None = None
+    ) -> Iterator[None]:
+        if self.session_report is None or self._record is not None:
+            yield
+            return
+        usb: dict[str, Any] = {}
+        try:
+            info = next(
+                (p for p in serial.tools.list_ports.comports() if same_port(p.device, port)), None
+            )
+            if info is not None:
+                usb = {
+                    key: getattr(info, key, None)
+                    for key in (
+                        "serial_number",
+                        "vid",
+                        "pid",
+                        "manufacturer",
+                        "product",
+                        "description",
+                        "location",
+                    )
+                }
+        except Exception:
+            pass
+        self._record = self.session_report.start_device(
+            port,
+            board=board or self.board,
+            mode=mode,
+            firmware=firmware,
+            tests={
+                "wifi": self.hardware_tests.wifi,
+                "rf": self.hardware_tests.rf_enabled,
+                "factory_reset": self.hardware_tests.factory_reset_after_test,
+            },
+            usb=usb,
+        )
+        self._record["rf_tester_port"] = self.hardware_tests.rf_port
+        try:
+            if mode == "test_only" and (
+                not self.hardware_tests.wifi or self.hardware_tests.wifi_ssid
+            ):
+                try:
+                    self._report_identity(read_ap_ssid(port).removeprefix("OpenShock-"))
+                except Exception as exc:
+                    self._record["warnings"].append(f"MAC read unavailable: {type(exc).__name__}")
+            yield
+        except BaseException as exc:
+            status = "failed" if isinstance(exc, Exception) else "interrupted"
+            self.session_report.finish_device(self._record, status, str(exc) or type(exc).__name__)
+            raise
+        else:
+            self.session_report.finish_device(self._record, "passed")
+        finally:
+            self._record = None
+
+    def _report_stage(self, name: str, status: str) -> None:
+        if self._record is not None and self.session_report is not None:
+            self._record["stages"][name] = status
+            self.session_report.save()
+
+    def _report_identity(self, mac: str) -> None:
+        if self._record is not None and self.session_report is not None:
+            self._record.update(mac_address=mac.upper(), mac_source="hub base MAC")
+            self.session_report.save()
+
+    def _report_event(self, kind: str, value: Any) -> None:
+        if self._record is None or self.session_report is None:
+            return
+        if kind == "start":
+            self._record["tests"][value]["status"] = "in_progress"
+        elif kind == "check":
+            self._record["tests"][value.name] = {
+                "status": "passed" if value.passed else "failed",
+                "detail": value.detail,
+                "elapsed_seconds": value.elapsed_seconds,
+            }
+        elif kind == "rf_command":
+            self._record["rf_commands"].append(value)
+        elif kind == "mac":
+            self._report_identity(value)
+        elif kind == "ap":
+            self._record["expected_ap"] = value
+        self.session_report.save()
 
     def set_state(self, state: str) -> None:
         """Change state and update terminal background"""
@@ -209,7 +316,7 @@ class AutoFlasher:
         self.log(f"✓ Firmware downloaded and verified ({size_bytes} bytes)")
         return firmware_data
 
-    def execute_post_flash_commands(self, port: str) -> None:
+    def execute_post_flash_commands(self, port: str) -> bool:
         """Execute post-flash commands over serial connection"""
         try:
             self.log("")
@@ -291,15 +398,23 @@ class AutoFlasher:
             self.log("✓ Post-flash commands completed")
             self.log("=" * 60)
 
+            return True
+
         except Exception as e:
             self.log(f"⚠ Warning: Post-flash command execution failed: {e}")
             self.log("Continuing anyway...")
+            return False
 
     def _run_esptool(self, args: List[str], operation: str, retries: int = 1) -> None:
         """Run esptool with a small retry window for transient disconnects."""
+        attempt_args = args.copy()
         for attempt in range(retries + 1):
             try:
-                esptool.main(args)
+                capture = (
+                    capture_identity(self._record) if self._record is not None else nullcontext()
+                )
+                with capture:
+                    esptool.main(attempt_args)
                 return
             except StopIteration as e:
                 # Some esptool/serial combinations can briefly drop transport
@@ -313,6 +428,38 @@ class AutoFlasher:
                     continue
                 raise Exception(f"{operation} failed after retry: {e}") from e
             except esptool.util.FatalError as e:
+                if str(e).startswith("Failed to start stub flasher"):
+                    if attempt < retries:
+                        # Stub startup precedes esptool's normal baud change.
+                        # Go below its 115200 initial rate to slow that stage too.
+                        baud_index = (
+                            attempt_args.index("--baud") + 1 if "--baud" in attempt_args else None
+                        )
+                        current_baud = int(attempt_args[baud_index]) if baud_index else 115200
+                        baud = min(current_baud, 57600 if current_baud > 57600 else 9600)
+                        attempt_args = attempt_args.copy()
+                        if baud_index is None:
+                            attempt_args = ["--baud", str(baud), *attempt_args]
+                        else:
+                            attempt_args[baud_index] = str(baud)
+                        self.log(
+                            f"⚠ {operation} stub startup failed; reconnecting at {baud} baud "
+                            f"({attempt + 1}/{retries})..."
+                        )
+                        if self._record is not None:
+                            self._record["retries"].append(
+                                {
+                                    "operation": operation,
+                                    "baud": baud,
+                                    "reason": "stub startup failed",
+                                }
+                            )
+                        time.sleep(1)
+                        continue
+                    raise Exception(
+                        f"{operation} failed: {e}\n"
+                        "Close other serial tools, power-cycle the hub, and check its USB cable and power."
+                    ) from e
                 # Port lock errors (EAGAIN 11) during reset; wait and retry.
                 if attempt < retries and "Resource temporarily unavailable" in str(e):
                     self.log(
@@ -327,10 +474,73 @@ class AutoFlasher:
                     return
                 raise Exception(f"{operation} failed: {e}") from e
 
+    def is_monitor_port(self, port: str) -> bool:
+        return bool(self.hardware_tests.rf_port and same_port(port, self.hardware_tests.rf_port))
+
+    def test_device(self, port: str) -> None:
+        """Run enabled checks and show their results in the terminal."""
+        if self.hardware_tests.rf_auto_detect and self.hardware_tests.rf_port is None:
+            self.set_state("error")
+            raise HardwareTestError("Select the RF tester port before testing")
+        if self.is_monitor_port(port):
+            self.set_state("error")
+            raise HardwareTestError("Refusing to test the RF monitor port as a hub")
+        with self._report_device(port, "test_only"):
+            self._test_device(port)
+
+    def _test_device(self, port: str) -> None:
+        self.set_state("flashing")
+        if self.test_only:
+            self.log("=" * 60)
+            self.log(f"Starting hardware tests for {self.board}")
+            self.log(f"Port: {port}")
+            self.log("=" * 60)
+        try:
+            result = run_hardware_tests(
+                port, self.hardware_tests, self.log, on_event=self._report_event
+            )
+        except Exception as exc:
+            detail = str(exc) if isinstance(exc, HardwareTestError) else type(exc).__name__
+            result = HardwareTestResult(port, [CheckResult("setup", False, detail, 0)])
+        for check in result.checks:
+            self._report_event("check", check)
+        try:
+            if not result.passed:
+                raise HardwareTestError(
+                    "Hardware testing failed: "
+                    + "; ".join(
+                        f"{check.name}: {check.detail}"
+                        for check in result.checks
+                        if not check.passed
+                    )
+                )
+        except Exception:
+            self.set_state("error")
+            raise
+        self.set_state("done")
+        if self.test_only:
+            self.log("=" * 60)
+        self.log("✓ All hardware tests passed")
+        if self.test_only:
+            self.log("=" * 60)
+        if self.test_only and self.alert:
+            self.play_alert()
+
     def flash_device(self, port: str, version: str, board: str) -> None:
         """Flash firmware to device"""
+        if self.is_monitor_port(port):
+            self.set_state("error")
+            raise HardwareTestError("Refusing to flash the RF monitor port")
+        with self._report_device(port, "flash", version, board):
+            self._flash_device(port, version, board)
+
+    def _flash_device(self, port: str, version: str, board: str) -> None:
         temp_firmware: Optional[Path] = None
         try:
+            if self.hardware_tests.rf_auto_detect and self.hardware_tests.rf_port is None:
+                raise HardwareTestError("Select the RF tester port before flashing")
+            if self.is_monitor_port(port):
+                raise HardwareTestError("Refusing to flash the RF monitor port")
             self.set_state("flashing")
             self.log("=" * 60)
             self.log(f"Starting flash process for {board}")
@@ -340,7 +550,14 @@ class AutoFlasher:
             self.log("=" * 60)
 
             # Download firmware
+            self._report_stage("download", "in_progress")
             firmware_data = self.download_firmware(version, board)
+            if self._record is not None:
+                self._record.update(
+                    firmware_sha256=hashlib.sha256(firmware_data).hexdigest(),
+                    firmware_size_bytes=len(firmware_data),
+                )
+            self._report_stage("download", "passed")
 
             # Save firmware to temporary file
             temp_file = tempfile.NamedTemporaryFile(
@@ -370,12 +587,14 @@ class AutoFlasher:
 
             if self.erase_flash:
                 self.log("Erasing flash...")
+                self._report_stage("erase", "in_progress")
                 erase_args = [
                     *base_args,
                     "erase-flash",
                 ]
 
                 self._run_esptool(erase_args, "Erase", retries=2)
+                self._report_stage("erase", "passed")
 
                 self.log("✓ Erase complete")
 
@@ -393,17 +612,26 @@ class AutoFlasher:
             )
 
             self.log("Flashing firmware...")
-
+            self._report_stage("flash", "in_progress")
             self._run_esptool(args, "Flash")
+            self._report_stage("flash", "passed")
 
             # Execute post-flash commands if any
             if self.post_flash_commands:
-                self.execute_post_flash_commands(port)
+                self._report_stage("post_flash", "in_progress")
+                success = self.execute_post_flash_commands(port)
+                self._report_stage("post_flash", "passed" if success else "failed")
+
+            if self.hardware_tests.enabled:
+                self.test_device(port)
 
             self.set_state("done")
             self.log("✓ Flashing complete!")
             self.log("=" * 60)
-            self.log("SUCCESS! Device flashed successfully")
+            self.log(
+                "SUCCESS! Device flashed"
+                + (" and hardware tests passed" if self.hardware_tests.enabled else " successfully")
+            )
             self.log("=" * 60)
 
             # Play alert beep if enabled
@@ -419,23 +647,86 @@ class AutoFlasher:
                 temp_firmware.unlink(missing_ok=True)
             self.log(f"✗ Error during flashing: {e}")
             raise
+        finally:
+            if temp_firmware:
+                temp_firmware.unlink(missing_ok=True)
+
+    def prepare_rf_monitor(self, target_port: Optional[str] = None) -> None:
+        """Reserve the first tester connection before accepting hubs to flash."""
+        if not self.hardware_tests.rf_auto_detect or self.hardware_tests.rf_port is not None:
+            return
+
+        self.log("RF tester auto-detection: plug in the tester first, then the hubs.")
+        previous: Optional[Set[str]] = None
+        while True:
+            ports = list(serial.tools.list_ports.comports())
+            eligible = [
+                p for p in ports if target_port is None or not same_port(p.device, target_port)
+            ]
+            current = {p.device for p in eligible}
+            candidates = current if previous is None else current - previous
+            if len(candidates) == 1:
+                selected = next(p for p in eligible if p.device in candidates)
+                self.hardware_tests = replace(self.hardware_tests, rf_port=selected.device)
+                if isinstance(selected.serial_number, str) and selected.serial_number:
+                    self.rf_monitor_identity = (selected.vid, selected.pid, selected.serial_number)
+                self.known_ports = {p.device for p in ports}
+                self.log(f"RF tester detected on {selected.device}; reserved for testing.")
+                return
+            if len(candidates) > 1:
+                self.log("Multiple serial ports detected. Unplug and reconnect only the RF tester.")
+            elif previous is None:
+                self.log("Waiting for the RF tester to be plugged in...")
+            previous = current
+            time.sleep(INITIAL_POLL_INTERVAL)
+
+    def refresh_rf_monitor_port(self, ports: list) -> None:
+        """Follow the selected USB tester if its serial port number changes."""
+        if self.rf_monitor_identity is None:
+            return
+        matches = [p for p in ports if (p.vid, p.pid, p.serial_number) == self.rf_monitor_identity]
+        if len(matches) == 1 and matches[0].device != self.hardware_tests.rf_port:
+            self.hardware_tests = replace(self.hardware_tests, rf_port=matches[0].device)
+            self.log(f"RF tester reconnected on {matches[0].device}; reserved for testing.")
 
     def detect_new_port(self) -> Optional[List[str]]:
         """Detect when a new serial port is connected"""
         try:
-            current_ports = set([p.device for p in serial.tools.list_ports.comports()])
+            ports = list(serial.tools.list_ports.comports())
+            self.refresh_rf_monitor_port(ports)
+            current_ports = {p.device for p in ports}
             new_ports = current_ports - self.known_ports
 
             if new_ports:
                 self.known_ports = current_ports
                 # Return all new ports, not just the first
-                return list(new_ports)
+                targets = [
+                    p.device
+                    for p in ports
+                    if p.device in new_ports
+                    and not self.is_monitor_port(p.device)
+                    and (
+                        self.rf_monitor_identity is None
+                        or (p.vid, p.pid, p.serial_number) != self.rf_monitor_identity
+                    )
+                ]
+                return targets or None
 
             self.known_ports = current_ports
         except Exception as e:
             # Log port detection errors instead of silently ignoring
             self.log(f"⚠ Warning: Port detection error: {e}")
         return None
+
+    def log_test_settings(self) -> None:
+        """Show which hardware tests and cleanup steps are enabled."""
+        self.log(f"WiFi AP test: {self.hardware_tests.wifi}")
+        self.log(f"RF test: {self.hardware_tests.rf_enabled}")
+        if self.hardware_tests.rf_port is not None:
+            self.log(f"RF monitor port: {self.hardware_tests.rf_port}")
+        elif self.hardware_tests.rf_auto_detect:
+            self.log("RF monitor port: auto-detect (plug tester in first)")
+        self.log(f"Factory reset after testing: {self.hardware_tests.factory_reset_after_test}")
 
     def run(self) -> None:
         """Main run loop"""
@@ -448,28 +739,39 @@ class AutoFlasher:
         self.log(f"Channel: {self.channel}")
         self.log(f"Erase flash: {self.erase_flash}")
         self.log(f"Auto-flash: {self.auto_flash}")
+        self.log(f"Test only: {self.test_only}")
+        self.log_test_settings()
         self.log("=" * 60)
         self.log("")
 
-        # Fetch version and boards
-        try:
-            version = self.fetch_version()
-            boards = self.fetch_boards(version)
+        # Existing firmware can be tested without reaching the firmware service.
+        version = None
+        if not self.test_only:
+            try:
+                version = self.fetch_version()
+                boards = self.fetch_boards(version)
 
-            # Early validation: check board exists before waiting
-            if self.board not in boards:
+                # Early validation: check board exists before waiting
+                if self.board not in boards:
+                    self.set_state("error")
+                    self.log(f"Error: Board '{self.board}' not found " "in available boards")
+                    self.log(f"Available boards: {', '.join(boards)}")
+                    if self.session_report is not None:
+                        self.session_report.finish("failed")
+                    return
+
+            except Exception as e:
                 self.set_state("error")
-                self.log(f"Error: Board '{self.board}' not found " "in available boards")
-                self.log(f"Available boards: {', '.join(boards)}")
+                self.log(f"Error fetching firmware info: {e}")
+                if self.session_report is not None:
+                    self.session_report.finish("failed")
                 return
 
-        except Exception as e:
-            self.set_state("error")
-            self.log(f"Error fetching firmware info: {e}")
-            return
-
         # Initialize known ports
-        self.known_ports = set([p.device for p in serial.tools.list_ports.comports()])
+        if self.hardware_tests.rf_auto_detect:
+            self.prepare_rf_monitor()
+        else:
+            self.known_ports = set([p.device for p in serial.tools.list_ports.comports()])
 
         self.set_state("waiting")
         self.log("Waiting for device to be plugged in...")
@@ -491,17 +793,26 @@ class AutoFlasher:
                         poll_interval = INITIAL_POLL_INTERVAL
                         consecutive_checks = 0
 
-                        if self.auto_flash:
+                        if self.test_only or self.auto_flash:
                             # Give device time to initialize
                             time.sleep(DEVICE_INIT_DELAY)
-                            self.flash_device(new_port, version, self.board)
+                            try:
+                                if self.test_only:
+                                    self.test_device(new_port)
+                                else:
+                                    assert version is not None and self.board is not None
+                                    self.flash_device(new_port, version, self.board)
+                            except Exception as exc:
+                                if self.test_only:
+                                    self.set_state("error")
+                                    self.log(f"Testing failed: {exc}")
+                                self.log("Device failed. Connect the next device to continue.")
 
-                            if self.auto_flash:
-                                self.log("")
-                                self.set_state("waiting")
-                                self.log("Waiting for next device...")
-                                self.log("(Press Ctrl+C to exit)")
-                                self.log("")
+                            self.log("")
+                            self.set_state("waiting")
+                            self.log("Waiting for next device...")
+                            self.log("(Press Ctrl+C to exit)")
+                            self.log("")
                         else:
                             self.log("Auto-flash disabled. Skipping...")
                 else:
@@ -513,12 +824,16 @@ class AutoFlasher:
                 time.sleep(poll_interval)
 
         except KeyboardInterrupt:
+            if self.session_report is not None:
+                self.session_report.finish_on_stop()
             console.print("\n")
             self.log("Exiting...")
 
         except Exception as e:
             self.set_state("error")
             self.log(f"Fatal error: {e}")
+            if self.session_report is not None:
+                self.session_report.finish("failed")
             import traceback
 
             traceback.print_exc()

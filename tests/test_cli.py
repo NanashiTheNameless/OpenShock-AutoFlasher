@@ -215,3 +215,208 @@ def test_argument_parser_version_is_optional():
 
     assert args.version is None
     assert args.board == "test-board"
+
+
+@pytest.fixture(autouse=True)
+def offline_help():
+    # Argument parsing must not depend on the public firmware service.
+    with (
+        patch("openshock_autoflasher.cli.fetch_boards_for_help", return_value=["test-board"]),
+        patch("openshock_autoflasher.cli.SessionReport"),
+    ):
+        yield
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--test-only"],
+        ["--factory-reset-after-test"],
+        ["--test-only", "--port", "dut"],
+        ["--no-auto", "--test-rf-port", "monitor"],
+        ["--port", "monitor", "--test-rf-port", "monitor"],
+        ["--test-timeout", "nan"],
+        ["--test-timeout", "inf"],
+        ["--test-timeout", "0"],
+    ],
+)
+def test_invalid_hardware_options_exit_before_flashing(monkeypatch, arguments):
+    from openshock_autoflasher.cli import main
+
+    monkeypatch.setattr("sys.argv", ["OPSH-AutoFlash", "--board", "test-board", *arguments])
+    with patch("openshock_autoflasher.cli.AutoFlasher") as flasher:
+        with pytest.raises(SystemExit) as error:
+            main()
+    assert error.value.code == 2
+    flasher.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--test-wifi-ssid", "OpenShock-AA:BB:CC:DD:EE:FF"],
+        ["--test-wifi", "--test-wifi-ssid", "wrong-name"],
+        ["--test-wifi", "--test-wifi-scan-command", "{}"],
+        ["--test-wifi", "--test-wifi-scan-command", "[]"],
+        ["--test-wifi", "--test-wifi-scan-command", '["python", 3]'],
+    ],
+)
+def test_invalid_wifi_options(monkeypatch, options):
+    from openshock_autoflasher.cli import main
+
+    monkeypatch.setattr("sys.argv", ["OPSH-AutoFlash", "--board", "test-board", *options])
+    with pytest.raises(SystemExit) as error:
+        main()
+    assert error.value.code == 2
+
+
+def test_test_only_skips_firmware_download(monkeypatch):
+    from openshock_autoflasher.cli import main
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "OPSH-AutoFlash",
+            "--board",
+            "test-board",
+            "--test-only",
+            "--port",
+            "dut",
+            "--test-rf-port",
+            "monitor",
+            "--test-wifi",
+            "--factory-reset-after-test",
+        ],
+    )
+    with patch("openshock_autoflasher.cli.AutoFlasher") as flasher:
+        main()
+    instance = flasher.return_value
+    instance.test_device.assert_called_once_with("dut")
+    instance.fetch_version.assert_not_called()
+    instance.flash_device.assert_not_called()
+    instance.run.assert_not_called()
+    assert flasher.call_args.kwargs["hardware_tests"].wifi is True
+    assert flasher.call_args.kwargs["hardware_tests"].factory_reset_after_test is True
+
+
+@pytest.mark.parametrize("options", [["--test-wifi"], ["--test-rf"], ["--test-rf-port", "monitor"]])
+def test_test_only_without_port_starts_continuous_testing(monkeypatch, options):
+    from openshock_autoflasher.cli import main
+
+    monkeypatch.setattr(
+        "sys.argv", ["OPSH-AutoFlash", "--board", "test-board", "--test-only", *options]
+    )
+    with patch("openshock_autoflasher.cli.AutoFlasher") as flasher:
+        main()
+    assert flasher.call_args.kwargs["test_only"] is True
+    flasher.return_value.run.assert_called_once_with()
+    flasher.return_value.flash_device.assert_not_called()
+
+
+def test_report_created_once_with_explicit_path_and_finalized(monkeypatch):
+    from openshock_autoflasher.cli import main
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "OPSH-AutoFlash",
+            "--board",
+            "board",
+            "--test-only",
+            "--test-wifi",
+            "--report",
+            "batch.html",
+        ],
+    )
+    with (
+        patch("openshock_autoflasher.cli.SessionReport") as report,
+        patch("openshock_autoflasher.cli.AutoFlasher") as flasher,
+    ):
+        main()
+    report.assert_called_once()
+    assert report.call_args.args == ("batch.html",)
+    assert flasher.call_args.kwargs["session_report"] is report.return_value
+    report.return_value.finish.assert_called_once_with("completed")
+
+
+def test_no_report_disables_file_creation(monkeypatch):
+    from openshock_autoflasher.cli import main
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["OPSH-AutoFlash", "--board", "board", "--test-only", "--test-wifi", "--no-report"],
+    )
+    with (
+        patch("openshock_autoflasher.cli.SessionReport") as report,
+        patch("openshock_autoflasher.cli.AutoFlasher") as flasher,
+    ):
+        main()
+    report.assert_not_called()
+    assert flasher.call_args.kwargs["session_report"] is None
+
+
+def test_one_shot_failure_exits_nonzero(monkeypatch):
+    from openshock_autoflasher.cli import main
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "OPSH-AutoFlash",
+            "--board",
+            "test-board",
+            "--test-only",
+            "--port",
+            "dut",
+            "--test-rf-port",
+            "monitor",
+        ],
+    )
+    with patch("openshock_autoflasher.cli.AutoFlasher") as flasher:
+        flasher.return_value.test_device.side_effect = RuntimeError("failed")
+        with pytest.raises(SystemExit) as error:
+            main()
+    assert error.value.code == 1
+
+
+def test_test_only_auto_rf_selects_tester_before_testing(monkeypatch):
+    from openshock_autoflasher.cli import main
+    from unittest.mock import call
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "OPSH-AutoFlash",
+            "--board",
+            "test-board",
+            "--port",
+            "hub",
+            "--test-only",
+            "--test-rf",
+            "--factory-reset-after-test",
+        ],
+    )
+    with patch("openshock_autoflasher.cli.AutoFlasher") as flasher:
+        main()
+    assert flasher.call_args.kwargs["hardware_tests"].rf_auto_detect
+    calls = flasher.return_value.mock_calls
+    assert calls.index(call.prepare_rf_monitor(target_port="hub")) < calls.index(
+        call.test_device("hub")
+    )
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--test-rf", "--test-rf-port", "monitor"],
+        ["--test-rf", "--no-auto"],
+    ],
+)
+def test_invalid_auto_rf_options(monkeypatch, options):
+    from openshock_autoflasher.cli import main
+
+    monkeypatch.setattr("sys.argv", ["OPSH-AutoFlash", "--board", "test-board", *options])
+    with patch("openshock_autoflasher.cli.AutoFlasher") as flasher:
+        with pytest.raises(SystemExit) as error:
+            main()
+    assert error.value.code == 2
+    flasher.assert_not_called()

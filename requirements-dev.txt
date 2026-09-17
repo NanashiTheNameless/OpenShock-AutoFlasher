@@ -2,14 +2,14 @@
 -r requirements.txt
 
 # Testing
-pytest>=9.0.2
-pytest-cov>=7.0.0
+pytest>=9.1.1
+pytest-cov>=7.1.0
 pytest-mock>=3.15.1
 
 # Code quality
-black>=26.1.0
+black>=26.5.1
 flake8>=7.3.0
-mypy>=1.19.1
+mypy>=2.3.1
 
 # Type stubs
-types-requests>=2.32.4.20260107
+types-requests>=2.33.0.20260906
