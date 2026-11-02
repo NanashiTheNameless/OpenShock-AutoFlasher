@@ -789,3 +789,58 @@ def test_test_only_alert_requires_passing_tests(passed):
             with pytest.raises(HardwareTestError):
                 flasher.test_device("hub")
     assert alert.call_count == int(passed)
+
+
+def test_flash_device_factory_resets_after_post_flash_without_tests(flasher):
+    """--factory-reset runs after flashing and post-flash commands, with no hardware tests."""
+    calls = []
+    flasher.factory_reset = True
+    flasher.post_flash_commands = ["status"]
+
+    with (
+        patch.object(flasher, "download_firmware", return_value=b"firmware"),
+        patch.object(flasher, "_run_esptool", side_effect=lambda *a, **k: calls.append("flash")),
+        patch.object(
+            flasher,
+            "execute_post_flash_commands",
+            side_effect=lambda port: calls.append("post_flash") or True,
+        ),
+        patch(
+            "openshock_autoflasher.flasher.factory_reset_hub",
+            side_effect=lambda port, config: calls.append(("reset", port)) or "reset ok",
+        ),
+        patch.object(flasher, "test_device") as test_device,
+    ):
+        flasher.flash_device("/dev/ttyUSB0", "1.0.0", "board")
+
+    assert calls == ["flash", "post_flash", ("reset", "/dev/ttyUSB0")]
+    test_device.assert_not_called()
+    assert flasher.state == "done"
+
+
+def test_flash_device_factory_reset_failure_fails_flash(flasher):
+    flasher.factory_reset = True
+
+    with (
+        patch.object(flasher, "download_firmware", return_value=b"firmware"),
+        patch.object(flasher, "_run_esptool"),
+        patch(
+            "openshock_autoflasher.flasher.factory_reset_hub",
+            side_effect=RuntimeError("no reply"),
+        ),
+    ):
+        with pytest.raises(RuntimeError, match="no reply"):
+            flasher.flash_device("/dev/ttyUSB0", "1.0.0", "board")
+
+    assert flasher.state == "error"
+
+
+def test_flash_device_skips_factory_reset_by_default(flasher):
+    with (
+        patch.object(flasher, "download_firmware", return_value=b"firmware"),
+        patch.object(flasher, "_run_esptool"),
+        patch("openshock_autoflasher.flasher.factory_reset_hub") as reset,
+    ):
+        flasher.flash_device("/dev/ttyUSB0", "1.0.0", "board")
+
+    reset.assert_not_called()

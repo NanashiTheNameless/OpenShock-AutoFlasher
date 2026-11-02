@@ -112,6 +112,14 @@ def create_argument_parser(
         help="Milliseconds to wait between post-flash commands (default: 0)",
     )
     parser.add_argument(
+        "--factory-reset",
+        action="store_true",
+        help=(
+            "Send factoryreset after flashing without hardware testing, "
+            "clearing hub settings and restarting"
+        ),
+    )
+    parser.add_argument(
         "--alert",
         "-A",
         action="store_true",
@@ -210,6 +218,11 @@ def main() -> None:
         parser.error("--test-only requires at least one WiFi or RF test")
     if args.no_auto and (testing or args.port):
         parser.error("--no-auto cannot be combined with hardware tests or --port")
+    if args.factory_reset and (testing or args.test_only or args.no_auto):
+        parser.error(
+            "--factory-reset cannot be combined with hardware tests, --test-only or --no-auto; "
+            "use --factory-reset-after-test with tests"
+        )
     if args.port and args.test_rf_port and same_port(args.port, args.test_rf_port):
         parser.error("--port and --test-rf-port must refer to separate devices")
     if not args.test_wifi and any(
@@ -252,6 +265,7 @@ def main() -> None:
                     "wifi": args.test_wifi,
                     "rf": hardware_tests.rf_enabled,
                     "factory_reset_after_test": args.factory_reset_after_test,
+                    "factory_reset": args.factory_reset,
                     "test_timeout_seconds": args.test_timeout,
                     "post_flash_command_count": len(args.post_flash or []),
                 },
@@ -268,6 +282,7 @@ def main() -> None:
             post_flash_commands=args.post_flash or [],
             post_flash_delay=args.post_flash_delay,
             alert=args.alert,
+            factory_reset=args.factory_reset,
             version=args.version,
             chip=args.chip,
             hardware_tests=hardware_tests,

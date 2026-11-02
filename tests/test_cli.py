@@ -232,6 +232,10 @@ def offline_help():
     [
         ["--test-only"],
         ["--factory-reset-after-test"],
+        ["--factory-reset", "--test-wifi"],
+        ["--factory-reset", "--test-rf-port", "monitor"],
+        ["--factory-reset", "--test-only", "--test-wifi"],
+        ["--factory-reset", "--no-auto"],
         ["--test-only", "--port", "dut"],
         ["--no-auto", "--test-rf-port", "monitor"],
         ["--port", "monitor", "--test-rf-port", "monitor"],
@@ -420,3 +424,14 @@ def test_invalid_auto_rf_options(monkeypatch, options):
             main()
     assert error.value.code == 2
     flasher.assert_not_called()
+
+
+def test_factory_reset_flag_reaches_flasher(monkeypatch):
+    from openshock_autoflasher.cli import main
+
+    monkeypatch.setattr("sys.argv", ["OPSH-AutoFlash", "--board", "test-board", "--factory-reset"])
+    with patch("openshock_autoflasher.cli.AutoFlasher") as flasher:
+        main()
+    assert flasher.call_args.kwargs["factory_reset"] is True
+    assert not flasher.call_args.kwargs["hardware_tests"].enabled
+    flasher.return_value.run.assert_called_once_with()

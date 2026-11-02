@@ -97,6 +97,7 @@ class SessionReport:
                 "flash": "not_run" if mode == "flash" else "skipped",
                 "erase": "not_requested",
                 "post_flash": "not_requested",
+                "factory_reset": "not_requested",
             },
             "tests": {
                 name: {"status": "not_run" if enabled else "disabled"}

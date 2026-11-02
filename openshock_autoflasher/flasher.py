@@ -40,6 +40,7 @@ from .hardware_tests import (
     HardwareTestConfig,
     HardwareTestError,
     HardwareTestResult,
+    factory_reset_hub,
     run_hardware_tests,
     same_port,
 )
@@ -74,6 +75,7 @@ class AutoFlasher:
         hardware_tests: Optional[HardwareTestConfig] = None,
         test_only: bool = False,
         session_report: Optional[SessionReport] = None,
+        factory_reset: bool = False,
     ) -> None:
         self.channel: str = channel
         self.board: Optional[str] = board
@@ -83,6 +85,7 @@ class AutoFlasher:
         self.post_flash_commands: List[str] = post_flash_commands or []
         self.post_flash_delay: float = post_flash_delay
         self.alert: bool = alert
+        self.factory_reset: bool = factory_reset
         self.version: Optional[str] = version
         self.chip: str = normalize_chip(chip)
         self.hardware_tests = hardware_tests or HardwareTestConfig()
@@ -622,6 +625,12 @@ class AutoFlasher:
                 success = self.execute_post_flash_commands(port)
                 self._report_stage("post_flash", "passed" if success else "failed")
 
+            if self.factory_reset:
+                self.log("Factory resetting hub...")
+                self._report_stage("factory_reset", "in_progress")
+                self.log(factory_reset_hub(port, self.hardware_tests))
+                self._report_stage("factory_reset", "passed")
+
             if self.hardware_tests.enabled:
                 self.test_device(port)
 
@@ -741,6 +750,7 @@ class AutoFlasher:
         self.log("=" * 60)
         self.log(f"Channel: {self.channel}")
         self.log(f"Erase flash: {self.erase_flash}")
+        self.log(f"Factory reset after flashing: {self.factory_reset}")
         self.log(f"Auto-flash: {self.auto_flash}")
         self.log(f"Test only: {self.test_only}")
         self.log_test_settings()

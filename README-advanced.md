@@ -57,6 +57,7 @@ On Windows PowerShell, activate with `.venv\Scripts\Activate.ps1` instead.
 | `--no-auto`    | `-N`  | Disable auto-flash (just detect devices)                       | `false`  |
 | `--post-flash` | `-P`  | Serial command to send after flashing (can use multiple times) | -        |
 | `--post-flash-delay` | - | Milliseconds to wait between post-flash commands               | `0`      |
+| `--factory-reset` | - | Send `factoryreset` after flashing, without hardware testing | `false` |
 | `--alert`      | `-A`  | Beep after successful flashing or testing                           | `false`  |
 | `--port` | - | Flash or test this serial port once and exit | - |
 | `--report` | - | Filename for the single HTML session report | Timestamped filename |
@@ -89,6 +90,16 @@ This replaces manual `--post-flash 'rftransmit ...'` and
 `--post-flash 'factoryreset'` commands. The RF test checks Beep, Vibrate, and Stop
 with different IDs. Factory reset runs after testing, including when a test fails,
 and clears saved hub settings. Omit `--factory-reset-after-test` to keep those settings.
+
+**Flash and factory-reset each hub without testing:**
+
+```bash
+OPSH-AutoFlash --board Wemos-D1-Mini-ESP32 --erase --factory-reset
+```
+
+Factory reset runs after flashing and any `--post-flash` commands, and waits for
+the hub to respond after restarting. It cannot be combined with hardware tests;
+use `--factory-reset-after-test` for that.
 
 **Flash with stable firmware:**
 
