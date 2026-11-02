@@ -1,5 +1,6 @@
 """Post-flash hardware checks using OpenShock's automated serial protocol."""
 
+from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 import json
@@ -15,6 +16,9 @@ from typing import Any, Callable, Iterator
 import serial
 
 from .wifi import AP_SSID, WiFiScanError, read_ap_ssid, scan_ap
+
+# Each CR or LF ends a line, matching the firmware's mixed line endings.
+LINE_END = re.compile(rb"[\r\n]")
 
 
 @dataclass(frozen=True)
@@ -86,6 +90,7 @@ class SerialSession:
         self.dtr = dtr
         self.serial: serial.Serial | None = None
         self.pending = bytearray()
+        self.lines: deque[str] = deque()
         self.received_bytes = 0
         self.received_preview = bytearray()
 
@@ -114,6 +119,7 @@ class SerialSession:
     def clear(self) -> None:
         assert self.serial is not None
         self.pending.clear()
+        self.lines.clear()
         self.received_bytes = 0
         self.received_preview.clear()
         self.serial.reset_input_buffer()
@@ -125,19 +131,27 @@ class SerialSession:
             raise HardwareTestError("Incomplete serial command write")
 
     def line(self) -> str | None:
+        """Return the next complete line, or None if none arrived before the read timeout."""
         assert self.serial is not None
-        byte = self.serial.read(1)
-        self.received_bytes += len(byte)
-        if len(self.received_preview) < 256:
-            self.received_preview.extend(byte)
-        if byte in (b"\n", b"\r"):
-            line = self.pending.decode("utf-8", errors="replace")
+        if self.lines:
+            return self.lines.popleft()
+        # Take everything already buffered in one call; block for one byte otherwise.
+        data = self.serial.read(max(1, self.serial.in_waiting))
+        self.received_bytes += len(data)
+        self.received_preview.extend(data[: 256 - len(self.received_preview)])
+        start = 0
+        for end in LINE_END.finditer(data):
+            self._extend_pending(data[start : end.start()])
+            self.lines.append(self.pending.decode("utf-8", errors="replace"))
             self.pending.clear()
-            return line
-        self.pending.extend(byte)
+            start = end.end()
+        self._extend_pending(data[start:])
+        return self.lines.popleft() if self.lines else None
+
+    def _extend_pending(self, data: bytes) -> None:
+        self.pending.extend(data)
         if len(self.pending) > 16384:
             raise HardwareTestError("Serial response exceeded maximum line length")
-        return None
 
     def wait_for(self, prefix: str, deadline: float) -> str:
         while time.monotonic() < deadline:

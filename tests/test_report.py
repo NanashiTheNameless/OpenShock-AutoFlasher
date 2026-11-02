@@ -260,3 +260,71 @@ def test_missing_usb_serial_is_unavailable_and_tester_is_not_reported(reporter):
         flasher.test_device("other-hub")
     assert report.data["devices"][0]["usb"] == {}
     assert "Unavailable" in report.path.read_text()
+
+
+def test_identity_capture_uses_base_mac_on_eui64_chips():
+    record = {}
+    tee = IdentityOutput(StringIO(), record)
+    tee.write("MAC:                aa:bb:cc:ff:fe:dd:ee:ff\n")
+    assert "mac_address" not in record
+    tee.write("BASE MAC:           aa:bb:cc:dd:ee:ff\nMAC_EXT:            ff:fe\n")
+    assert record["mac_address"] == "AA:BB:CC:DD:EE:FF"
+
+
+def test_flash_mac_feeds_wifi_test_without_a_second_esptool_read(reporter):
+    flasher, report = reporter
+    configs = []
+
+    def esptool_run(_args):
+        print("MAC: aa:bb:cc:dd:ee:ff")
+
+    def tests(port, config, log, *, on_event):
+        configs.append(config)
+        return HardwareTestResult(port, [CheckResult("wifi", True, "AP seen", 1)])
+
+    with (
+        patch("openshock_autoflasher.flasher.esptool.main", side_effect=esptool_run),
+        patch("openshock_autoflasher.flasher.run_hardware_tests", side_effect=tests),
+    ):
+        flasher.flash_device("hub", "1.2.3", "board")
+    assert configs[0].wifi_ssid == "OpenShock-AA:BB:CC:DD:EE:FF"
+    # The session-wide setting is untouched, so the next hub reads its own MAC.
+    assert flasher.hardware_tests.wifi_ssid is None
+
+
+def test_flash_mac_is_reused_without_a_session_report(monkeypatch):
+    flasher = AutoFlasher(board="board", hardware_tests=HardwareTestConfig(wifi=True))
+    monkeypatch.setattr(flasher, "download_firmware", lambda *_: b"firmware")
+    monkeypatch.setattr(flasher, "log", lambda *_: None)
+    with (
+        patch(
+            "openshock_autoflasher.flasher.esptool.main",
+            side_effect=lambda _args: print("MAC: aa:bb:cc:dd:ee:ff"),
+        ),
+        patch.object(flasher, "test_device") as test_device,
+    ):
+        flasher.flash_device("hub", "1.2.3", "board")
+    test_device.assert_called_once_with("hub", "OpenShock-AA:BB:CC:DD:EE:FF")
+
+
+def test_only_progress_saves_skip_fsync(tmp_path):
+    report = SessionReport(str(tmp_path / "session.html"))
+    with patch("openshock_autoflasher.report.os.fsync") as fsync:
+        record = report.start_device("hub", board="b", mode="flash", firmware="1", tests={}, usb={})
+        report.save()
+        assert fsync.call_count == 0
+        report.finish_device(record, "passed")
+        assert fsync.call_count == 1
+        report.finish()
+        assert fsync.call_count == 2
+
+
+def test_finished_attempts_render_once_and_in_progress_attempts_stay_live(tmp_path):
+    report = SessionReport(str(tmp_path / "session.html"))
+    done = report.start_device("hub", board="b", mode="flash", firmware="1", tests={}, usb={})
+    report.finish_device(done, "passed")
+    live = report.start_device("hub2", board="b", mode="flash", firmware="1", tests={}, usb={})
+    assert list(report._rendered) == [1]
+    live["mac_address"] = "11:22:33:44:55:66"
+    report.save()
+    assert "11:22:33:44:55:66" in report.path.read_text()

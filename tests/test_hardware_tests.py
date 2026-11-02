@@ -59,6 +59,11 @@ class FakeSerial:
         self.respond(self, data.decode().strip())
         return len(data)
 
+    @property
+    def in_waiting(self):
+        # Report one byte at a time so tests observe each byte being consumed.
+        return 1 if self.data else 0
+
     def read(self, _size):
         with self.lock:
             if self.data:
@@ -121,6 +126,8 @@ def rig(monkeypatch):
             target.open()
             for name in ("read", "write", "close", "reset_input_buffer"):
                 setattr(proxy, name, getattr(target, name))
+            # Mock gives each instance its own class, so this only affects this proxy.
+            type(proxy).in_waiting = property(lambda _: target.in_waiting)
 
         proxy.open = open_port
         return proxy
@@ -658,3 +665,19 @@ def test_async_reader_stops_even_when_its_queue_is_full(rig):
                 real_sleep(0.001)
             assert lines.full()
         assert not any(thread.name == "rf-monitor-reader" for thread in enumerate_threads())
+
+
+def test_line_splits_a_multi_line_chunk_like_byte_reads():
+    session = hw.SerialSession("dut", 1)
+    session.serial = Mock(in_waiting=13)
+    session.serial.read.side_effect = [b"one\r\ntwo\nthr", b"ee\n", b"", b""]
+    assert [session.line() for _ in range(6)] == ["one", "", "two", "three", None, None]
+    session.serial.read.assert_any_call(13)
+
+
+def test_line_length_limit_applies_within_a_chunk():
+    session = hw.SerialSession("dut", 1)
+    session.serial = Mock(in_waiting=20000)
+    session.serial.read.return_value = b"x" * 20000 + b"\n"
+    with pytest.raises(hw.HardwareTestError, match="maximum line length"):
+        session.line()

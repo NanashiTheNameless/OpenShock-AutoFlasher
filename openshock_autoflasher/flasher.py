@@ -7,7 +7,7 @@ import importlib.metadata
 import tempfile
 import textwrap
 import time
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
@@ -91,6 +91,8 @@ class AutoFlasher:
         self.hardware_tests = hardware_tests or HardwareTestConfig()
         self.session_report = session_report
         self._record: Optional[dict[str, Any]] = None
+        # esptool identity output for the hub being flashed when no report is kept
+        self._esptool_identity: dict[str, Any] = {}
         self.rf_monitor_identity: Optional[tuple[Optional[int], Optional[int], str]] = None
         self.base_url: str = BASE_URL
         self.known_ports: Set[str] = set()
@@ -100,6 +102,8 @@ class AutoFlasher:
         self.version_cache: Optional[str] = None
         # Cache boards list
         self.boards_cache: Optional[List[str]] = None
+        # Verified firmware images, reused for every hub in a batch
+        self.firmware_cache: dict[tuple[str, str], bytes] = {}
 
     def get_style(self) -> Style:
         """Get style based on current state"""
@@ -271,7 +275,11 @@ class AutoFlasher:
         return self.boards_cache
 
     def download_firmware(self, version: str, board: str) -> bytes:
-        """Download and verify firmware binary with progress"""
+        """Download and verify firmware binary (cached per version and board)"""
+        cached = self.firmware_cache.get((version, board))
+        if cached is not None:
+            self.log(f"✓ Using verified firmware from this session ({len(cached)} bytes)")
+            return cached
         self.log(f"Downloading firmware for {board}...")
 
         firmware_url = f"{self.base_url}/{version}/{board}/firmware.bin"
@@ -317,6 +325,7 @@ class AutoFlasher:
 
         size_bytes = len(firmware_data)
         self.log(f"✓ Firmware downloaded and verified ({size_bytes} bytes)")
+        self.firmware_cache[(version, board)] = firmware_data
         return firmware_data
 
     def execute_post_flash_commands(self, port: str) -> bool:
@@ -356,10 +365,10 @@ class AutoFlasher:
                 deadline = time.monotonic() + 2.0
                 raw = bytearray()
                 while time.monotonic() < deadline:
-                    byte = ser.read(1)
-                    if not byte:
+                    chunk = ser.read(max(1, ser.in_waiting))
+                    if not chunk:
                         break
-                    raw.extend(byte)
+                    raw.extend(chunk)
 
                 decoded = raw.decode("utf-8", errors="ignore")
                 # Normalize \r\n and bare \r to \n so splitlines doesn't
@@ -413,10 +422,9 @@ class AutoFlasher:
         attempt_args = args.copy()
         for attempt in range(retries + 1):
             try:
-                capture = (
-                    capture_identity(self._record) if self._record is not None else nullcontext()
-                )
-                with capture:
+                with capture_identity(
+                    self._record if self._record is not None else self._esptool_identity
+                ):
                     esptool.main(attempt_args)
                 return
             except StopIteration as e:
@@ -480,8 +488,12 @@ class AutoFlasher:
     def is_monitor_port(self, port: str) -> bool:
         return bool(self.hardware_tests.rf_port and same_port(port, self.hardware_tests.rf_port))
 
-    def test_device(self, port: str) -> None:
-        """Run enabled checks and show their results in the terminal."""
+    def test_device(self, port: str, ap_ssid: Optional[str] = None) -> None:
+        """Run enabled checks and show their results in the terminal.
+
+        ap_ssid comes from the MAC esptool printed while flashing, saving the
+        WiFi test a second esptool connection and hub reboot.
+        """
         if self.hardware_tests.rf_auto_detect and self.hardware_tests.rf_port is None:
             self.set_state("error")
             raise HardwareTestError("Select the RF tester port before testing")
@@ -489,19 +501,20 @@ class AutoFlasher:
             self.set_state("error")
             raise HardwareTestError("Refusing to test the RF monitor port as a hub")
         with self._report_device(port, "test_only"):
-            self._test_device(port)
+            self._test_device(port, ap_ssid)
 
-    def _test_device(self, port: str) -> None:
+    def _test_device(self, port: str, ap_ssid: Optional[str] = None) -> None:
         self.set_state("flashing")
         if self.test_only:
             self.log("=" * 60)
             self.log(f"Starting hardware tests for {self.board}")
             self.log(f"Port: {port}")
             self.log("=" * 60)
+        config = self.hardware_tests
+        if ap_ssid and config.wifi and config.wifi_ssid is None:
+            config = replace(config, wifi_ssid=ap_ssid)
         try:
-            result = run_hardware_tests(
-                port, self.hardware_tests, self.log, on_event=self._report_event
-            )
+            result = run_hardware_tests(port, config, self.log, on_event=self._report_event)
         except Exception as exc:
             detail = str(exc) if isinstance(exc, HardwareTestError) else type(exc).__name__
             result = HardwareTestResult(port, [CheckResult("setup", False, detail, 0)])
@@ -539,6 +552,7 @@ class AutoFlasher:
 
     def _flash_device(self, port: str, version: str, board: str) -> None:
         temp_firmware: Optional[Path] = None
+        self._esptool_identity = {}
         try:
             if self.hardware_tests.rf_auto_detect and self.hardware_tests.rf_port is None:
                 raise HardwareTestError("Select the RF tester port before flashing")
@@ -632,7 +646,9 @@ class AutoFlasher:
                 self._report_stage("factory_reset", "passed")
 
             if self.hardware_tests.enabled:
-                self.test_device(port)
+                identity = self._record if self._record is not None else self._esptool_identity
+                mac = identity.get("mac_address")
+                self.test_device(port, f"OpenShock-{mac}" if mac else None)
 
             self.set_state("done")
             self.log("✓ Flashing complete!")

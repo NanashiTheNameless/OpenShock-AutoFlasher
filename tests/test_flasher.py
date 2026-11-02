@@ -141,6 +141,11 @@ def test_download_firmware(mock_get, flasher):
 
     result = flasher.download_firmware("1.0.0", "test-board")
     assert result == firmware_data
+    assert mock_get.call_count == 2
+
+    # Later hubs in the same batch reuse the verified image.
+    assert flasher.download_firmware("1.0.0", "test-board") == firmware_data
+    assert mock_get.call_count == 2
 
 
 @patch("openshock_autoflasher.flasher.requests.get")
@@ -162,6 +167,7 @@ def test_download_firmware_hash_mismatch(mock_get, flasher):
 
     with pytest.raises(ValueError, match="Hash mismatch"):
         flasher.download_firmware("1.0.0", "test-board")
+    assert flasher.firmware_cache == {}
 
 
 @patch("openshock_autoflasher.flasher.serial.tools.list_ports.comports")
@@ -273,6 +279,7 @@ def test_execute_post_flash_commands_waits_between_commands(mock_sleep, mock_ser
     )
 
     mock_ser_instance = MagicMock()
+    mock_ser_instance.in_waiting = 0
     mock_serial.return_value = mock_ser_instance
 
     flasher.execute_post_flash_commands("/dev/ttyUSB0")
@@ -521,7 +528,7 @@ def test_hardware_tests_gate_flash_success_and_alert(flasher):
     ):
         with pytest.raises(HardwareTestError, match="RF failed"):
             flasher.flash_device("dut", "1.0", "board")
-    check.assert_called_once_with("dut")
+    check.assert_called_once_with("dut", None)
     alert.assert_not_called()
     assert flasher.state == "error"
 

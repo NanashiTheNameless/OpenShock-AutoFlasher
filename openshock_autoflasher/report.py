@@ -55,6 +55,8 @@ class SessionReport:
             "devices": [],
         }
         self._starts: dict[int, float] = {}
+        # Finished attempts never change, so their HTML is rendered once.
+        self._rendered: dict[int, str] = {}
         self.data["settings"].update(
             host_platform=platform.platform(), python_version=platform.python_version()
         )
@@ -126,12 +128,12 @@ class SessionReport:
         for value in device["tests"].values():
             if value["status"] == "in_progress":
                 value["status"] = "interrupted" if status == "interrupted" else "failed"
-        self.save()
+        self.save(durable=True)
 
     def finish(self, status: str = "completed") -> None:
         if self.data["finished_at"] is None:
             self.data.update(status=status, finished_at=utc_now())
-            self.save()
+            self.save(durable=True)
 
     def finish_on_stop(self) -> None:
         """Treat stopping between devices as a normal end to a batch."""
@@ -140,8 +142,12 @@ class SessionReport:
         )
         self.finish("interrupted" if interrupted else "completed")
 
-    def save(self) -> None:
-        """Replace the same report atomically, preserving the previous copy on error."""
+    def save(self, *, durable: bool = False) -> None:
+        """Replace the same report atomically, preserving the previous copy on error.
+
+        Progress updates skip fsync; finished attempts and the session end are
+        flushed to disk so a crash or power loss keeps every completed result.
+        """
         temporary = None
         try:
             with tempfile.NamedTemporaryFile(
@@ -153,8 +159,9 @@ class SessionReport:
             ) as output:
                 temporary = Path(output.name)
                 output.write(self.render())
-                output.flush()
-                os.fsync(output.fileno())
+                if durable:
+                    output.flush()
+                    os.fsync(output.fileno())
             os.replace(temporary, self.path)
         finally:
             if temporary is not None:
@@ -233,74 +240,81 @@ class SessionReport:
             )
         body.append("</tbody></table>")
         for d in devices:
-            body.append(
-                f"<details open><summary>Attempt {d['attempt']}: {text(d['port'])} - {status(d['status'])}</summary>"
-            )
-            body.append(
-                table(
-                    [
-                        (key.replace("_", " ").title(), d.get(key))
-                        for key in (
-                            "mac_address",
-                            "mac_source",
-                            "board",
-                            "chip",
-                            "mode",
-                            "firmware_version",
-                            "firmware_sha256",
-                            "firmware_size_bytes",
-                            "started_at",
-                            "finished_at",
-                            "elapsed_seconds",
-                            "error",
-                        )
-                    ]
+            cached = self._rendered.get(d["attempt"])
+            if cached is None:
+                section: list[str] = []
+                section.append(
+                    f"<details open><summary>Attempt {d['attempt']}: {text(d['port'])} - {status(d['status'])}</summary>"
                 )
-            )
-            body.append(
-                "<h3>Tests</h3><table><tr><th>Test</th><th>Status</th><th>Seconds</th><th>Detail</th></tr>"
-            )
-            for name, result in d["tests"].items():
-                body.append(
-                    "<tr>"
-                    + "".join(
-                        f"<td>{status(v) if i == 1 else text(v)}</td>"
-                        for i, v in enumerate(
-                            (
-                                name,
-                                result["status"],
-                                result.get("elapsed_seconds"),
-                                result.get("detail", ""),
+                section.append(
+                    table(
+                        [
+                            (key.replace("_", " ").title(), d.get(key))
+                            for key in (
+                                "mac_address",
+                                "mac_source",
+                                "board",
+                                "chip",
+                                "mode",
+                                "firmware_version",
+                                "firmware_sha256",
+                                "firmware_size_bytes",
+                                "started_at",
+                                "finished_at",
+                                "elapsed_seconds",
+                                "error",
+                            )
+                        ]
+                    )
+                )
+                section.append(
+                    "<h3>Tests</h3><table><tr><th>Test</th><th>Status</th><th>Seconds</th><th>Detail</th></tr>"
+                )
+                for name, result in d["tests"].items():
+                    section.append(
+                        "<tr>"
+                        + "".join(
+                            f"<td>{status(v) if i == 1 else text(v)}</td>"
+                            for i, v in enumerate(
+                                (
+                                    name,
+                                    result["status"],
+                                    result.get("elapsed_seconds"),
+                                    result.get("detail", ""),
+                                )
                             )
                         )
+                        + "</tr>"
                     )
-                    + "</tr>"
+                section.append(
+                    "</table><h3>RF commands</h3><table><tr><th>ID</th><th>Channel</th><th>Mode</th><th>Intensity</th><th>Duration (ms)</th><th>Status</th><th>Detail</th></tr>"
                 )
-            body.append(
-                "</table><h3>RF commands</h3><table><tr><th>ID</th><th>Channel</th><th>Mode</th><th>Intensity</th><th>Duration (ms)</th><th>Status</th><th>Detail</th></tr>"
-            )
-            for case in d["rf_commands"]:
-                body.append(
-                    "<tr>"
-                    + "".join(
-                        f"<td>{status(case.get(k)) if k == 'status' else text(case.get(k))}</td>"
-                        for k in (
-                            "remote_id",
-                            "channel",
-                            "mode",
-                            "intensity",
-                            "duration_ms",
-                            "status",
-                            "detail",
+                for case in d["rf_commands"]:
+                    section.append(
+                        "<tr>"
+                        + "".join(
+                            f"<td>{status(case.get(k)) if k == 'status' else text(case.get(k))}</td>"
+                            for k in (
+                                "remote_id",
+                                "channel",
+                                "mode",
+                                "intensity",
+                                "duration_ms",
+                                "status",
+                                "detail",
+                            )
                         )
+                        + "</tr>"
                     )
-                    + "</tr>"
+                section.append(
+                    "</table><details><summary>All device data</summary><pre>"
+                    + escape(json.dumps(d, indent=2, ensure_ascii=True))
+                    + "</pre></details></details>"
                 )
-            body.append(
-                "</table><details><summary>All device data</summary><pre>"
-                + escape(json.dumps(d, indent=2, ensure_ascii=True))
-                + "</pre></details></details>"
-            )
+                cached = "\n".join(section)
+                if d["status"] != "in_progress":
+                    self._rendered[d["attempt"]] = cached
+            body.append(cached)
         body.append(
             "<details><summary>Session settings</summary><pre>"
             + escape(json.dumps(self.data["settings"], indent=2, ensure_ascii=True))
@@ -327,7 +341,11 @@ class IdentityOutput:
         lines = self.pending.replace("\r", "\n").split("\n")
         self.pending = lines.pop()[-4096:]
         for line in lines:
-            match = re.fullmatch(r"\s*MAC:\s*((?:[\da-fA-F]{2}:){5}[\da-fA-F]{2})\s*", line)
+            # Chips with an EUI-64 print it as "MAC:" and the six-byte base MAC
+            # as "BASE MAC:"; the six-byte pattern only accepts the base MAC.
+            match = re.fullmatch(
+                r"\s*(?:BASE )?MAC:\s*((?:[\da-fA-F]{2}:){5}[\da-fA-F]{2})\s*", line
+            )
             if match:
                 self.device["mac_address"] = match[1].upper()
                 self.device["mac_source"] = "esptool"
